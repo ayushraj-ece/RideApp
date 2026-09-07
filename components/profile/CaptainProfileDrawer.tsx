@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { X, User, Phone, Mail, Bike, Car, ShieldCheck, Sun, Moon, Check, Edit2, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { X, User, Phone, Mail, Bike, Car, ShieldCheck, Sun, Moon, Check, Edit2, Loader2, LogOut } from 'lucide-react';
 import { UserProfile, CaptainProfile, VehicleType } from '@/types/ride';
 import { createClient } from '@/lib/supabase/client';
+import { useTheme } from '@/components/theme/ThemeProvider';
 
 interface CaptainProfileDrawerProps {
   isOpen: boolean;
@@ -20,7 +22,9 @@ export default function CaptainProfileDrawer({
   captain,
   onUpdate,
 }: CaptainProfileDrawerProps) {
+  const router = useRouter();
   const supabase = createClient();
+  const { theme, toggleTheme } = useTheme();
 
   const [name, setName] = useState(profile?.name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -33,18 +37,27 @@ export default function CaptainProfileDrawer({
   
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    if (profile) {
+      setName(profile.name || '');
+      setPhone(profile.phone || '');
+    }
+    if (captain) {
+      setVehicleType(captain.vehicle_type || 'BIKE');
+      setVehicleNumber(captain.vehicle_number || '');
+      setVehicleModel(captain.vehicle_model || '');
+      setLicenseNumber(captain.license_number || '');
+      setAcceptsRides(captain.accepts_rides !== false);
+      setAcceptsParcels(captain.accepts_parcels !== false);
+    }
+  }, [profile, captain, isOpen]);
 
   if (!isOpen || !profile || !captain) return null;
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/captain/login');
   };
 
   const handleSave = async () => {
@@ -242,6 +255,22 @@ export default function CaptainProfileDrawer({
                   )}
                 </div>
               </div>
+
+              <div>
+                <label className="block text-slate-500 dark:text-slate-400 font-medium mb-1">Driving License Number</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    className="w-full rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3.5 py-2.5 text-slate-900 dark:text-white font-bold focus:outline-none"
+                  />
+                ) : (
+                  <p className="font-extrabold text-slate-900 dark:text-slate-100 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {captain.license_number || 'DL-1420110012345'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -287,11 +316,22 @@ export default function CaptainProfileDrawer({
             >
               <div className="flex items-center gap-2">
                 {theme === 'dark' ? <Moon className="h-4 w-4 text-amber-400" /> : <Sun className="h-4 w-4 text-amber-500" />}
-                <span>Appearance Mode</span>
+                <span>Appearance Theme</span>
               </div>
-              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+              <span className="text-[10px] uppercase font-black px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-500 border border-amber-400/30">
                 {theme} Mode
               </span>
+            </button>
+          </div>
+
+          {/* LOGOUT BUTTON */}
+          <div className="pt-2 pb-4">
+            <button
+              onClick={handleLogout}
+              className="w-full p-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 flex items-center justify-center gap-2 text-xs font-extrabold text-rose-600 dark:text-rose-400 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Log Out of Captain Account</span>
             </button>
           </div>
         </div>

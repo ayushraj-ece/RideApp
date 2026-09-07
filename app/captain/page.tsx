@@ -518,6 +518,14 @@ export default function CaptainHomePage() {
                   <Crosshair className="h-3.5 w-3.5 text-slate-400 hover:text-amber-500" />
                 )}
               </button>
+
+              <button
+                onClick={() => setIsCaptainProfileOpen(true)}
+                title="Captain Profile & Preferences"
+                className="p-1.5 rounded-xl bg-amber-400/20 border border-amber-400/30 text-amber-500 hover:bg-amber-400/30 shrink-0 transition-colors cursor-pointer"
+              >
+                <User className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         </div>
