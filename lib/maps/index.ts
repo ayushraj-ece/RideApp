@@ -1,4 +1,6 @@
 export interface MapSearchResult {
+  title?: string;
+  subtitle?: string;
   display_name: string;
   lat: number;
   lng: number;
@@ -9,6 +11,11 @@ export interface RouteData {
   distanceKm: number;
   durationMinutes: number;
 }
+
+/**
+ * Popular & recent search suggestions array (dynamically populated from real user history)
+ */
+export const POPULAR_LOCATIONS: MapSearchResult[] = [];
 
 /**
  * Haversine formula to compute great-circle distance between two points on Earth in km.
@@ -42,23 +49,33 @@ export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
       query
-    )}&limit=5&addressdetails=1`;
+    )}&limit=10&addressdetails=1`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'RapidoRideApp/1.0',
+        'User-Agent': 'Rideon/1.0',
       },
     });
 
     if (!res.ok) throw new Error('Geocoding API error');
     const data = await res.json();
 
-    return data.map((item: any) => ({
-      display_name: item.display_name,
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon),
-    }));
+    const apiResults: MapSearchResult[] = data.map((item: any) => {
+      const parts = (item.display_name || '').split(',');
+      const title = parts[0]?.trim() || item.name || 'Location';
+      const subtitle = parts.slice(1, 4).join(',').trim() || item.display_name;
+
+      return {
+        title,
+        subtitle,
+        display_name: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+      };
+    });
+
+    return apiResults;
   } catch (error) {
-    console.warn('Geocoding search error, returning empty fallback array:', error);
+    console.warn('Geocoding search error:', error);
     return [];
   }
 }
@@ -71,7 +88,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'RapidoRideApp/1.0',
+        'User-Agent': 'Rideon/1.0',
       },
     });
 

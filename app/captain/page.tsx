@@ -7,20 +7,33 @@ import MapContainer from '@/components/map/MapContainer';
 import ChatDrawer from '@/components/chat/ChatDrawer';
 import { createClient } from '@/lib/supabase/client';
 import { Ride, UserProfile, CaptainProfile } from '@/types/ride';
-import { getDirectionsRoute, calculateHaversineDistance } from '@/lib/maps';
+import { getDirectionsRoute, reverseGeocode } from '@/lib/maps';
+import { getFareBreakdown } from '@/lib/pricing/fareEngine';
 import { soundEffects } from '@/lib/audio/soundEffects';
 import {
   Power,
   Navigation,
   MapPin,
   MessageSquare,
-  CheckCircle2,
-  XCircle,
-  KeyRound,
   Loader2,
+  Bike,
+  Car,
+  CheckCircle,
+  ArrowRight,
+  ShieldAlert,
+  Clock,
+  ChevronRight,
+  Sparkles,
+  TrendingUp,
   DollarSign,
+  Radio,
   Star,
-  Check,
+  Activity,
+  Crosshair,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
+  XCircle,
 } from 'lucide-react';
 
 export default function CaptainHomePage() {
@@ -32,8 +45,14 @@ export default function CaptainHomePage() {
   const [captain, setCaptain] = useState<CaptainProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // GPS position tracking
+  // Earnings & Stats
+  const [todayEarnings, setTodayEarnings] = useState<number>(0);
+  const [completedTripsCount, setCompletedTripsCount] = useState<number>(0);
+
+  // GPS position & address tracking
   const [gpsCoords, setGpsCoords] = useState<[number, number] | null>(null);
+  const [captainAddress, setCaptainAddress] = useState<string>('Detecting current GPS location...');
+  const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
 
   // Incoming Realtime Request State
@@ -47,10 +66,50 @@ export default function CaptainHomePage() {
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState('');
 
-  // Drawers
+  // Drawers & Modals
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
 
-  // 1. Initialize Captain Profile
+  // High-Accuracy GPS Auto-Detection & Reverse Geocoding
+  const detectCaptainLocation = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    setIsDetectingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const coords: [number, number] = [lat, lng];
+        setGpsCoords(coords);
+
+        const addr = await reverseGeocode(lat, lng);
+        setCaptainAddress(addr);
+        setIsDetectingGps(false);
+
+        if (captain) {
+          await supabase.rpc('update_captain_location', {
+            p_captain_id: captain.id,
+            p_lat: lat,
+            p_lng: lng,
+          });
+        }
+      },
+      (err) => {
+        console.warn('Captain GPS permission or fetch error:', err);
+        const defaultCoords: [number, number] = [28.6139, 77.209];
+        setGpsCoords((prev) => prev || defaultCoords);
+        setCaptainAddress('Connaught Place, New Delhi');
+        setIsDetectingGps(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  useEffect(() => {
+    detectCaptainLocation();
+  }, [captain?.id]);
+
+  // 1. Initialize Captain Profile & Daily Stats
   useEffect(() => {
     async function initCaptain() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -82,12 +141,31 @@ export default function CaptainHomePage() {
         setCaptain(capt as CaptainProfile);
         setIsOnline(capt.online_status);
         if (capt.latitude && capt.longitude) {
-          setGpsCoords([capt.latitude, capt.longitude]);
+          const coords: [number, number] = [capt.latitude, capt.longitude];
+          setGpsCoords(coords);
+          reverseGeocode(capt.latitude, capt.longitude).then((addr) => setCaptainAddress(addr));
         }
       }
+
+      // Fetch Today's Earnings & Trips Stats
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data: earningsData } = await supabase
+        .from('captain_earnings')
+        .select('amount')
+        .eq('captain_id', session.user.id)
+        .gte('created_at', todayStart.toISOString());
+
+      if (earningsData) {
+        const sum = earningsData.reduce((acc, curr) => acc + Number(curr.amount), 0);
+        setTodayEarnings(sum);
+        setCompletedTripsCount(earningsData.length);
+      }
+
       setLoading(false);
 
-      // Check if captain has an existing active ride
+      // Check active ride
       const { data: activeRides } = await supabase
         .from('rides')
         .select('*, customer:profiles!rides_customer_id_fkey(*)')
@@ -117,7 +195,6 @@ export default function CaptainHomePage() {
         const coords: [number, number] = [lat, lng];
         setGpsCoords(coords);
 
-        // Update database via RPC
         await supabase.rpc('update_captain_location', {
           p_captain_id: captain.id,
           p_lat: lat,
@@ -135,21 +212,18 @@ export default function CaptainHomePage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [isOnline, captain?.id, activeRide?.id]);
 
-  // Helper to update navigation route based on ride stage
   const updateRouteForRide = async (ride: Ride, currentPos: [number, number] | null) => {
     const origin = currentPos || [ride.pickup_lat, ride.pickup_lng];
     if (['ACCEPTED', 'CAPTAIN_ARRIVING'].includes(ride.status)) {
-      // Route to pickup
       const route = await getDirectionsRoute(origin, [ride.pickup_lat, ride.pickup_lng]);
       setRouteCoords(route.coordinates);
     } else if (['CAPTAIN_ARRIVED', 'IN_PROGRESS', 'OTP_VERIFIED'].includes(ride.status)) {
-      // Route to destination
       const route = await getDirectionsRoute(origin, [ride.destination_lat, ride.destination_lng]);
       setRouteCoords(route.coordinates);
     }
   };
 
-  // 3. Online / Offline Toggle
+  // Online / Offline Toggle
   const toggleOnlineStatus = async () => {
     if (!captain) return;
     const newOnlineStatus = !isOnline;
@@ -167,7 +241,7 @@ export default function CaptainHomePage() {
     }
   };
 
-  // 4. Realtime Listener for Incoming Ride Requests matching Captain's vehicle type
+  // Realtime Listener for Incoming Ride Requests
   useEffect(() => {
     if (!isOnline || !captain || activeRide) return;
 
@@ -213,7 +287,7 @@ export default function CaptainHomePage() {
     }
   }, [incomingRequest, requestTimeout]);
 
-  // 5. Accept Ride (Prevents double acceptance via RPC)
+  // Accept Ride (Prevents double acceptance via RPC)
   const handleAcceptRide = async () => {
     if (!incomingRequest || !captain) return;
 
@@ -242,7 +316,7 @@ export default function CaptainHomePage() {
     }
   };
 
-  // 6. Captain State Transitions: Arrived -> Verify OTP -> Complete Ride
+  // State Transitions
   const handleMarkArrived = async () => {
     if (!activeRide) return;
     const { data, error } = await supabase
@@ -292,24 +366,56 @@ export default function CaptainHomePage() {
     });
 
     if (!error) {
+      setTodayEarnings((prev) => prev + (activeRide.estimated_fare || 0));
+      setCompletedTripsCount((prev) => prev + 1);
       alert(`Ride completed! Fare of ₹${activeRide.estimated_fare} recorded in your earnings.`);
       setActiveRide(null);
       setRouteCoords([]);
     }
   };
 
+  const handleCancelRide = async (reason = 'Cancelled by captain') => {
+    if (!activeRide || !profile) return;
+
+    try {
+      const { error } = await supabase.rpc('cancel_ride', {
+        p_ride_id: activeRide.id,
+        p_user_id: profile.id,
+        p_reason: reason,
+      });
+
+      if (!error) {
+        setActiveRide(null);
+        setRouteCoords([]);
+      } else {
+        alert(error.message || 'Failed to cancel ride');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error cancelling ride');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-400 mb-2" />
-        <p className="text-sm font-medium">Loading Captain Portal...</p>
+      <div className="h-screen bg-slate-100 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
+        <Loader2 className="h-7 w-7 animate-spin text-amber-500 mb-2" />
+        <p className="text-xs font-semibold tracking-wide uppercase text-slate-500">Loading Captain Dashboard...</p>
       </div>
     );
   }
 
+  const ratingAvg = captain && captain.rating_count > 0
+    ? (captain.rating_sum / captain.rating_count).toFixed(1)
+    : '5.0';
+
   return (
-    <div className="relative h-screen w-full bg-slate-950 flex flex-col overflow-hidden text-slate-100">
-      <Navbar role="CAPTAIN" userName={profile?.name} />
+    <div className="relative h-screen w-full bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+      <Navbar
+        role="CAPTAIN"
+        userName={profile?.name}
+        userProfile={profile}
+        onProfileUpdate={(updated) => setProfile(updated)}
+      />
 
       {/* Main Map View */}
       <div className="relative flex-1 w-full overflow-hidden">
@@ -324,76 +430,180 @@ export default function CaptainHomePage() {
           />
         </div>
 
-        {/* Top Controls: ONLINE/OFFLINE Banner */}
-        <div className="absolute top-4 inset-x-3 sm:inset-x-4 z-20 flex justify-between items-center max-w-md mx-auto pointer-events-auto">
-          <button
-            onClick={toggleOnlineStatus}
-            disabled={!!activeRide}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-extrabold text-sm shadow-2xl backdrop-blur-md transition-all ${
-              isOnline
-                ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:text-white'
-            }`}
-          >
-            <Power className="h-5 w-5" />
-            <span>{isOnline ? 'ONLINE (RECEIVING RIDES)' : 'GO ONLINE'}</span>
-          </button>
-
-          {captain && (
-            <div className="flex items-center gap-2 rounded-2xl bg-slate-900/90 border border-slate-800 px-3.5 py-2.5 shadow-xl text-xs font-bold text-amber-400">
-              <span>{captain.vehicle_type}</span>
-              <span className="text-slate-400 font-normal">| {captain.vehicle_number}</span>
+        {/* TOP PERSISTENT CAPTAIN DASHBOARD BAR */}
+        <div className="absolute top-3 inset-x-3 sm:inset-x-4 z-20 max-w-lg mx-auto pointer-events-auto">
+          <div className="rounded-2xl bg-white/95 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 p-2.5 px-4 shadow-lg backdrop-blur-md flex items-center justify-between">
+            {/* Today Earnings Pill */}
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                <DollarSign className="h-4 w-4" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 dark:text-slate-500 block">Today's Pay</span>
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{todayEarnings}</span>
+              </div>
             </div>
-          )}
+
+            {/* Completed Trips Counter */}
+            <div className="flex items-center gap-2 border-l border-slate-200 dark:border-slate-800 pl-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 font-bold">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-extrabold text-slate-400 dark:text-slate-500 block">Trips</span>
+                <span className="text-sm font-black text-slate-900 dark:text-slate-100">{completedTripsCount} Trips</span>
+              </div>
+            </div>
+
+            {/* Vehicle Badge */}
+            {captain && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200">
+                {captain.vehicle_type === 'BIKE' ? <Bike className="h-4 w-4 text-amber-500" /> : <Car className="h-4 w-4 text-amber-500" />}
+                <span className="hidden sm:inline">{captain.vehicle_type}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* BOTTOM CARDS */}
-        <div className="absolute bottom-4 inset-x-3 sm:inset-x-4 z-20 max-w-md mx-auto pointer-events-auto">
-          {/* POPUP 1: REALTIME INCOMING RIDE REQUEST */}
+        {/* FLOATING LIVE CAPTAIN LOCATION DISPLAY PILL */}
+        <div className="absolute top-16 inset-x-3 sm:inset-x-4 z-20 max-w-md mx-auto pointer-events-auto">
+          <div className="rounded-full bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 p-2 px-3.5 shadow-md backdrop-blur-md flex items-center justify-between gap-2 text-xs text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-2 truncate font-semibold">
+              <MapPin className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="truncate">{captainAddress}</span>
+            </div>
+
+            <button
+              onClick={detectCaptainLocation}
+              disabled={isDetectingGps}
+              title="Refresh Captain GPS location"
+              className="p-1 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white shrink-0"
+            >
+              {isDetectingGps ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Crosshair className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* DOCKED FULL-WIDTH CAPTAIN BOTTOM DASHBOARD SHEET */}
+        <div className="absolute inset-x-0 bottom-0 z-20 max-w-lg mx-auto w-full pointer-events-auto">
+          {/* CASE A: OFFLINE STATE */}
+          {!isOnline && !activeRide && (
+            <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-3 w-3 rounded-full bg-slate-400" />
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">You Are Currently Offline</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Go online to start receiving ride requests</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-xl">
+                  <Star className="h-3.5 w-3.5 fill-amber-500" />
+                  <span>{ratingAvg}</span>
+                </div>
+              </div>
+
+              {/* PRIMARY CTA: GO ONLINE */}
+              <button
+                onClick={toggleOnlineStatus}
+                className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-emerald-500 py-3.5 text-sm font-extrabold tracking-wider uppercase text-slate-950 hover:bg-emerald-400 transition-colors shadow-md active:scale-[0.99]"
+              >
+                <Power className="h-5 w-5" />
+                <span>GO ONLINE TO START EARNING</span>
+              </button>
+            </div>
+          )}
+
+          {/* CASE B: ONLINE STATE */}
+          {isOnline && !incomingRequest && !activeRide && (
+            <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <div>
+                    <h3 className="font-black text-sm text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Radio className="h-4 w-4 animate-pulse text-emerald-500" />
+                      YOU ARE ONLINE
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Searching nearby ride requests...</p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Today</span>
+                  <span className="text-xs font-black text-slate-900 dark:text-slate-100">₹{todayEarnings}</span>
+                </div>
+              </div>
+
+              {/* GO OFFLINE BUTTON */}
+              <button
+                onClick={toggleOnlineStatus}
+                className="w-full rounded-2xl bg-slate-100 dark:bg-slate-900 py-3 text-xs font-bold text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase tracking-wider"
+              >
+                GO OFFLINE
+              </button>
+            </div>
+          )}
+
+          {/* CASE C: INCOMING RIDE REQUEST POPUP SHEET */}
           {incomingRequest && !activeRide && (
-            <div className="rounded-3xl bg-slate-900 border-2 border-amber-400 p-5 shadow-2xl animate-bounce-short text-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+            <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t-4 border-amber-500 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-slate-900 dark:text-slate-100 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-amber-400 animate-ping" />
-                  <h3 className="font-bold text-base text-amber-400">NEW RIDE REQUEST!</h3>
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping" />
+                  <h3 className="font-black text-xs tracking-wider uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4" />
+                    NEW RIDE REQUEST
+                  </h3>
                 </div>
-                <span className="text-xs font-mono font-bold bg-amber-500/20 text-amber-400 px-2 py-1 rounded-lg">
-                  {requestTimeout}s
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs mb-4">
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-slate-400 text-[10px]">PICKUP</span>
-                    <p className="font-semibold text-slate-200">{incomingRequest.pickup_address}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Navigation className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-slate-400 text-[10px]">DESTINATION</span>
-                    <p className="font-semibold text-slate-200">{incomingRequest.destination_address}</p>
-                  </div>
-                </div>
-                <div className="flex justify-between border-t border-slate-800 pt-2 font-bold text-sm">
-                  <span>Distance: <span className="text-amber-400">{incomingRequest.distance_km} km</span></span>
-                  <span>Fare: <span className="text-emerald-400">₹{incomingRequest.estimated_fare}</span></span>
+                <div className="flex items-center gap-1 text-xs font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-xl border border-amber-500/20">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{requestTimeout}s</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 text-xs bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Pickup</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">{incomingRequest.pickup_address}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+                  <Navigation className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Destination</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">{incomingRequest.destination_address}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-800/80 pt-2.5 font-bold text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">Distance: <strong className="text-slate-900 dark:text-slate-200 font-black">{incomingRequest.distance_km} km</strong></span>
+                  <span className="text-slate-500 dark:text-slate-400">Payout: <strong className="text-emerald-500 text-base font-black">₹{incomingRequest.estimated_fare}</strong></span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={() => setIncomingRequest(null)}
-                  className="rounded-xl bg-slate-800 py-3 text-xs font-bold text-rose-400 border border-slate-700 hover:bg-slate-700"
+                  className="rounded-2xl bg-slate-100 dark:bg-slate-900 py-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                 >
                   REJECT
                 </button>
                 <button
                   onClick={handleAcceptRide}
                   disabled={acceptingLoading}
-                  className="rounded-xl bg-amber-400 py-3 text-xs font-bold text-slate-950 hover:bg-amber-300 transition-colors flex items-center justify-center gap-1 shadow-lg"
+                  className="rounded-2xl bg-amber-400 py-3.5 text-xs font-extrabold uppercase text-slate-950 hover:bg-amber-300 transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-[0.99]"
                 >
                   {acceptingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'ACCEPT RIDE'}
                 </button>
@@ -401,63 +611,117 @@ export default function CaptainHomePage() {
             </div>
           )}
 
-          {/* ACTIVE RIDE PANEL */}
+          {/* CASE D: ACTIVE RIDE NAVIGATION DASHBOARD SHEET */}
           {activeRide && (
-            <div className="rounded-3xl bg-slate-900/95 border border-slate-800 p-5 shadow-2xl backdrop-blur-md space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[70vh] overflow-y-auto">
+              {/* HEADER STATUS & CHAT */}
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {activeRide.status.replace('_', ' ')}
                   </span>
-                  <h3 className="font-bold text-slate-100 text-sm mt-1">
-                    {activeRide.status === 'ACCEPTED' && 'Navigate to Pickup Point'}
-                    {activeRide.status === 'CAPTAIN_ARRIVED' && 'Enter Customer Start OTP'}
-                    {activeRide.status === 'IN_PROGRESS' && 'Driving to Destination'}
+                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-xs mt-1.5">
+                    {activeRide.status === 'ACCEPTED' && 'Navigate to Pickup Location'}
+                    {activeRide.status === 'CAPTAIN_ARRIVED' && 'Verify 4-Digit OTP from Customer'}
+                    {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Driving to Destination'}
                   </h3>
                 </div>
 
                 <button
                   onClick={() => setIsChatOpen(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                  className="flex items-center gap-1.5 rounded-2xl bg-amber-400 px-3.5 py-2 text-xs font-extrabold text-slate-950 hover:bg-amber-300 shadow-md"
                 >
                   <MessageSquare className="h-4 w-4" />
-                  Chat
+                  <span>Chat</span>
                 </button>
               </div>
 
-              {/* Ride Address Details */}
-              <div className="space-y-2 text-xs bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Target</span>
-                  <span className="font-bold text-amber-400">
-                    {['ACCEPTED', 'CAPTAIN_ARRIVING'].includes(activeRide.status) ? 'Pickup' : 'Destination'}
-                  </span>
+              {/* CUSTOMER & ROUTE SUMMARY CARD */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Customer Trip</span>
+                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">Payout: ₹{activeRide.estimated_fare}</span>
                 </div>
-                <p className="font-semibold text-slate-200 text-sm">
-                  {['ACCEPTED', 'CAPTAIN_ARRIVING'].includes(activeRide.status)
-                    ? activeRide.pickup_address
-                    : activeRide.destination_address}
-                </p>
-                <div className="flex justify-between border-t border-slate-700/50 pt-2 font-semibold">
-                  <span>Distance: {activeRide.distance_km} km</span>
-                  <span className="text-emerald-400 font-bold">Collect Cash/UPI: ₹{activeRide.estimated_fare}</span>
+
+                <div className="flex items-center gap-2.5">
+                  <div className="h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">Pickup</span>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.pickup_address}</p>
+                  </div>
+                </div>
+
+                <div className="ml-1 pl-4 border-l-2 border-dashed border-slate-300 dark:border-slate-700 py-0.5">
+                  <span className="text-[10px] font-bold text-slate-400">{activeRide.distance_km} km distance</span>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">Destination</span>
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.destination_address}</p>
+                  </div>
                 </div>
               </div>
 
-              {/* STEP 1: MARK ARRIVED */}
+              {/* COLLAPSIBLE FARE BREAKDOWN FOR CAPTAIN */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
+                <button
+                  onClick={() => setShowFareBreakdown(!showFareBreakdown)}
+                  className="w-full flex items-center justify-between p-3 text-xs font-extrabold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-emerald-500" />
+                    <span>Fare & Payout Breakdown</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-black">₹{activeRide.estimated_fare}</span>
+                    {showFareBreakdown ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                  </div>
+                </button>
+
+                {showFareBreakdown && (
+                  <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 space-y-2 text-xs">
+                    {(() => {
+                      const breakdown = getFareBreakdown(activeRide.distance_km || 1, activeRide.vehicle_type || 'BIKE');
+                      return (
+                        <>
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                            <span>Base Trip Rate</span>
+                            <span>₹{breakdown.baseFare}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                            <span>Distance Payout ({activeRide.distance_km} km)</span>
+                            <span>₹{breakdown.distanceCharge}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                            <span>Platform Fee</span>
+                            <span>₹{breakdown.bookingFee}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-800 font-black text-slate-900 dark:text-slate-100">
+                            <span>Total Cash Collection</span>
+                            <span className="text-emerald-500 text-sm">₹{activeRide.estimated_fare}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* PRIMARY RIDE STATE ACTIONS */}
               {activeRide.status === 'ACCEPTED' && (
                 <button
                   onClick={handleMarkArrived}
-                  className="w-full rounded-2xl bg-amber-400 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300 transition-colors shadow-lg"
+                  className="w-full rounded-2xl bg-amber-400 py-3.5 text-xs font-extrabold uppercase tracking-wider text-slate-950 hover:bg-amber-300 transition-transform active:scale-[0.99] shadow-md"
                 >
-                  I HAVE ARRIVED AT PICKUP
+                  ARRIVED AT PICKUP
                 </button>
               )}
 
-              {/* STEP 2: VERIFY OTP FORM */}
               {activeRide.status === 'CAPTAIN_ARRIVED' && (
                 <form onSubmit={handleVerifyOtp} className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-300">Enter Customer 4-digit OTP</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Enter Customer 4-digit OTP</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -465,28 +729,36 @@ export default function CaptainHomePage() {
                       value={otpInput}
                       onChange={(e) => setOtpInput(e.target.value)}
                       placeholder="e.g. 1234"
-                      className="flex-1 rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="flex-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-center text-base font-mono font-bold tracking-widest text-amber-600 dark:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                     <button
                       type="submit"
-                      className="rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-slate-950 hover:bg-emerald-400"
+                      className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 shadow-md"
                     >
-                      START RIDE
+                      START
                     </button>
                   </div>
-                  {otpError && <p className="text-xs text-rose-400">{otpError}</p>}
+                  {otpError && <p className="text-xs text-rose-500 font-medium">{otpError}</p>}
                 </form>
               )}
 
-              {/* STEP 3: COMPLETE RIDE */}
               {activeRide.status === 'IN_PROGRESS' && (
                 <button
                   onClick={handleCompleteRide}
-                  className="w-full rounded-2xl bg-emerald-500 py-3.5 text-sm font-bold text-slate-950 hover:bg-emerald-400 transition-colors shadow-lg"
+                  className="w-full rounded-2xl bg-emerald-500 py-3.5 text-xs font-extrabold uppercase tracking-wider text-slate-950 hover:bg-emerald-400 transition-transform active:scale-[0.99] shadow-md"
                 >
-                  COMPLETE RIDE & COLLECT FARE (₹{activeRide.estimated_fare})
+                  COMPLETE RIDE & COLLECT ₹{activeRide.estimated_fare}
                 </button>
               )}
+
+              {/* RED CANCEL RIDE BUTTON IN CAPTAIN DASHBOARD */}
+              <button
+                onClick={() => handleCancelRide('Captain cancelled trip')}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 py-3.5 text-xs font-extrabold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shadow-sm"
+              >
+                <XCircle className="h-4 w-4" />
+                <span>Cancel Ride</span>
+              </button>
             </div>
           )}
         </div>
@@ -498,6 +770,8 @@ export default function CaptainHomePage() {
           rideId={activeRide.id}
           currentUserId={profile.id}
           currentUserRole="CAPTAIN"
+          recipientName={activeRide.customer?.name || 'Customer'}
+          recipientPhone={activeRide.customer?.phone || '+91 98765 43210'}
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
         />

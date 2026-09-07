@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Ride, UserProfile } from '@/types/ride';
 import { History, Calendar, MapPin, Navigation, Bike, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import CustomerBottomNav from '@/components/ui/CustomerBottomNav';
 
 export default function CustomerRidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
@@ -40,38 +41,43 @@ export default function CustomerRidesPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-      <Navbar role="CUSTOMER" userName={user?.name} />
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 font-sans">
+      <Navbar
+        role="CUSTOMER"
+        userName={user?.name}
+        userProfile={user}
+        onProfileUpdate={(updated) => setUser(updated)}
+      />
 
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6">
+      <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 pb-20">
         <div className="flex items-center gap-3 mb-6">
           <Link
             href="/customer"
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+            className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <History className="h-5 w-5 text-amber-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <History className="h-5 w-5 text-amber-500" />
               Ride History
             </h1>
-            <p className="text-xs text-slate-400">All your completed and previous trips</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">All your completed and previous trips</p>
           </div>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
           </div>
         ) : rides.length === 0 ? (
-          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-8 text-center text-slate-400">
-            <Bike className="h-12 w-12 mx-auto mb-3 text-slate-600" />
+          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400 shadow-sm">
+            <Bike className="h-12 w-12 mx-auto mb-3 text-slate-400 dark:text-slate-600" />
             <p className="text-sm font-semibold">No rides found</p>
-            <p className="text-xs text-slate-500 mt-1">Book your first ride now!</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Book your first ride now!</p>
             <Link
               href="/customer"
-              className="mt-4 inline-block rounded-xl bg-amber-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-300"
+              className="mt-4 inline-block rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 shadow-md"
             >
               Book a Ride
             </Link>
@@ -81,18 +87,18 @@ export default function CustomerRidesPage() {
             {rides.map((ride) => (
               <div
                 key={ride.id}
-                className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg space-y-3"
+                className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-3"
               >
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <Calendar className="h-3.5 w-3.5" />
                     <span>{new Date(ride.created_at).toLocaleDateString()} at {new Date(ride.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                       ride.status === 'COMPLETED'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
                     }`}
                   >
                     {ride.status.replace('_', ' ')}
@@ -101,23 +107,23 @@ export default function CustomerRidesPage() {
 
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 line-clamp-1">{ride.pickup_address}</span>
+                    <MapPin className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="text-slate-800 dark:text-slate-300 line-clamp-1">{ride.pickup_address}</span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Navigation className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 line-clamp-1">{ride.destination_address}</span>
+                    <Navigation className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                    <span className="text-slate-800 dark:text-slate-300 line-clamp-1">{ride.destination_address}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
-                  <span className="text-slate-400">
-                    Vehicle: <strong className="text-amber-400">{ride.vehicle_type}</strong>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Vehicle: <strong className="text-amber-600 dark:text-amber-400">{ride.vehicle_type}</strong>
                   </span>
-                  <span className="text-slate-400">
-                    Distance: <strong className="text-slate-200">{ride.distance_km} km</strong>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Distance: <strong className="text-slate-800 dark:text-slate-200">{ride.distance_km} km</strong>
                   </span>
-                  <span className="font-extrabold text-amber-400 text-sm">
+                  <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
                     ₹{ride.final_fare || ride.estimated_fare}
                   </span>
                 </div>
@@ -126,6 +132,8 @@ export default function CustomerRidesPage() {
           </div>
         )}
       </main>
+
+      <CustomerBottomNav activeTab="RIDE" />
     </div>
   );
 }

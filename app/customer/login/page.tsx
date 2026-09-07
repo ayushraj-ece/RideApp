@@ -49,49 +49,49 @@ export default function CustomerLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center px-4 py-8">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center items-center px-4 py-8 transition-colors duration-200 font-sans">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="h-14 w-14 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-950 font-black mb-4 shadow-lg">
             <Bike className="h-8 w-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-100">Customer Login</h1>
-          <p className="text-sm text-slate-400 mt-1">Book fast rides in seconds</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Customer Login</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Book fast rides in seconds</p>
         </div>
 
         {error && (
-          <div className="mb-6 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400 text-center">
+          <div className="mb-6 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-600 dark:text-rose-400 text-center font-medium">
             {error}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email Address</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="customer@example.com"
-                className="w-full rounded-xl bg-slate-800 border border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl bg-slate-800 border border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
           </div>
@@ -99,22 +99,22 @@ export default function CustomerLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-semibold text-slate-950 hover:bg-amber-400 transition-colors disabled:opacity-50"
+            className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-bold text-slate-950 hover:bg-amber-400 transition-colors disabled:opacity-50 shadow-md"
           >
             {loading ? 'Signing in...' : 'Sign In'}
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
           Don't have a customer account?{' '}
-          <Link href="/customer/register" className="font-semibold text-amber-400 hover:underline">
+          <Link href="/customer/register" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">
             Register here
           </Link>
         </div>
 
-        <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-          <Link href="/captain/login" className="text-xs text-slate-500 hover:text-slate-300">
+        <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-4 text-center">
+          <Link href="/captain/login" className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200">
             Are you a Captain? Login to Captain Portal →
           </Link>
         </div>

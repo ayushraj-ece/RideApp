@@ -24,6 +24,13 @@ interface MapViewProps {
   className?: string;
 }
 
+// Vector SVG Icons for Vehicles (No Emojis!)
+const VEHICLE_SVG_ICONS: Record<VehicleType, string> = {
+  BIKE: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h2l3 6.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>`,
+  AUTO: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`,
+  CAB: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M7 11h10"/></svg>`,
+};
+
 export default function MapView({
   center = MAP_CONFIG.defaultCenter,
   zoom = MAP_CONFIG.defaultZoom,
@@ -36,6 +43,12 @@ export default function MapView({
   onMapClick,
   className = 'h-full w-full',
 }: MapViewProps) {
+  const onMapClickRef = useRef(onMapClick);
+
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
@@ -60,8 +73,8 @@ export default function MapView({
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     map.on('click', (e: L.LeafletMouseEvent) => {
-      if (onMapClick) {
-        onMapClick(e.latlng.lat, e.latlng.lng);
+      if (onMapClickRef.current) {
+        onMapClickRef.current(e.latlng.lat, e.latlng.lng);
       }
     });
 
@@ -75,7 +88,7 @@ export default function MapView({
     };
   }, []);
 
-  // Update Center & Fit Bounds smoothly
+  // Update Center & Fit Bounds
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -104,13 +117,13 @@ export default function MapView({
     // 1. Customer Location Marker (Pulsing Dot)
     if (customerLocation) {
       const icon = L.divIcon({
-        html: `<div class="relative flex items-center justify-center w-8 h-8">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-5 w-5 bg-sky-500 border-2 border-white shadow-lg"></span>
+        html: `<div class="relative flex items-center justify-center w-7 h-7">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60"></span>
+            <span class="relative inline-flex rounded-full h-4 w-4 bg-sky-500 border-2 border-white shadow-md"></span>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
 
       if (!markersRef.current['customer']) {
@@ -123,18 +136,18 @@ export default function MapView({
       delete markersRef.current['customer'];
     }
 
-    // 2. Pickup Location Marker (Rapido Green Teardrop Pin)
+    // 2. Pickup Location Marker (Sleek Emerald Teardrop)
     if (pickupLocation) {
       const icon = L.divIcon({
-        html: `<div class="flex flex-col items-center group">
-            <div class="bg-gradient-to-tr from-emerald-600 to-teal-400 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-2xl border-2 border-white flex items-center gap-1">
+        html: `<div class="flex flex-col items-center">
+            <div class="bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-[10px] tracking-wider uppercase px-2.5 py-0.5 rounded-full shadow-xl border border-white flex items-center gap-1">
               <span>PICKUP</span>
             </div>
-            <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-emerald-600 drop-shadow-md"></div>
+            <div class="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-emerald-600 shadow-sm"></div>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [80, 42],
-        iconAnchor: [40, 42],
+        iconSize: [70, 36],
+        iconAnchor: [35, 36],
       });
 
       if (!markersRef.current['pickup']) {
@@ -148,18 +161,18 @@ export default function MapView({
       delete markersRef.current['pickup'];
     }
 
-    // 3. Destination Location Marker (Rapido Red Teardrop Pin)
+    // 3. Destination Location Marker (Sleek Rose Teardrop)
     if (destinationLocation) {
       const icon = L.divIcon({
-        html: `<div class="flex flex-col items-center group">
-            <div class="bg-gradient-to-tr from-rose-600 to-pink-500 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-2xl border-2 border-white flex items-center gap-1">
+        html: `<div class="flex flex-col items-center">
+            <div class="bg-gradient-to-tr from-rose-600 to-pink-500 text-white font-extrabold text-[10px] tracking-wider uppercase px-2.5 py-0.5 rounded-full shadow-xl border border-white flex items-center gap-1">
               <span>DROP</span>
             </div>
-            <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-rose-600 drop-shadow-md"></div>
+            <div class="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-rose-600 shadow-sm"></div>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [80, 42],
-        iconAnchor: [40, 42],
+        iconSize: [70, 36],
+        iconAnchor: [35, 36],
       });
 
       if (!markersRef.current['destination']) {
@@ -176,12 +189,12 @@ export default function MapView({
     // 4. Assigned Captain Live Marker (Gold Badge)
     if (captainLocation) {
       const icon = L.divIcon({
-        html: `<div class="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black rounded-full p-2.5 shadow-2xl border-2 border-white flex items-center justify-center text-sm transform hover:scale-110 transition-transform">
-            ⚡ CAPTAIN
+        html: `<div class="bg-slate-900 border-2 border-amber-400 text-amber-400 rounded-full p-2 shadow-2xl flex items-center justify-center">
+            ${VEHICLE_SVG_ICONS['BIKE']}
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [90, 36],
-        iconAnchor: [45, 18],
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
       });
 
       if (!markersRef.current['captain_assigned']) {
@@ -194,7 +207,7 @@ export default function MapView({
       delete markersRef.current['captain_assigned'];
     }
 
-    // 5. Nearby Available Captains
+    // 5. Nearby Available Captains (Vector SVG Vehicles in Dark Badges)
     Object.keys(markersRef.current).forEach((key) => {
       if (key.startsWith('nearby_') && !nearbyCaptains.some((c) => `nearby_${c.id}` === key)) {
         map.removeLayer(markersRef.current[key]);
@@ -204,14 +217,14 @@ export default function MapView({
 
     nearbyCaptains.forEach((c) => {
       const key = `nearby_${c.id}`;
-      const symbol = c.vehicle_type === 'BIKE' ? '🏍️' : c.vehicle_type === 'AUTO' ? '🛺' : '🚗';
+      const svgIcon = VEHICLE_SVG_ICONS[c.vehicle_type] || VEHICLE_SVG_ICONS['BIKE'];
       const icon = L.divIcon({
-        html: `<div class="bg-slate-900 text-amber-400 rounded-full p-1.5 shadow-md border border-amber-400/60 flex items-center justify-center text-sm">
-            ${symbol}
+        html: `<div class="bg-slate-950/90 rounded-full p-1.5 shadow-md border border-slate-700/80 flex items-center justify-center hover:scale-110 transition-transform">
+            ${svgIcon}
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
       });
 
       if (!markersRef.current[key]) {
@@ -221,7 +234,7 @@ export default function MapView({
       }
     });
 
-    // 6. Polyline Route Drawing (Dual layer glow path)
+    // 6. Polyline Route Drawing (Dual layer path)
     if (polylineBgRef.current) {
       map.removeLayer(polylineBgRef.current);
       polylineBgRef.current = null;
@@ -232,18 +245,16 @@ export default function MapView({
     }
 
     if (routeCoordinates && routeCoordinates.length > 0) {
-      // Outer Casing line
       polylineBgRef.current = L.polyline(routeCoordinates, {
         color: '#0f172a',
-        weight: 9,
-        opacity: 0.7,
+        weight: 8,
+        opacity: 0.65,
         lineCap: 'round',
       }).addTo(map);
 
-      // Inner Vibrant Route line
       polylineFgRef.current = L.polyline(routeCoordinates, {
         color: '#38bdf8',
-        weight: 5,
+        weight: 4,
         opacity: 0.95,
         lineCap: 'round',
       }).addTo(map);

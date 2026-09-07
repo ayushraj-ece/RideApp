@@ -1,9 +1,30 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950;
+    @apply bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors duration-200;
   }
+}
+
+/* Custom Scrollbar for dropdowns and chat */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
 }
 
 /* Custom Leaflet Map Icon Styling */
@@ -12,34 +33,49 @@
   border: none;
 }
 
-/* Custom Leaflet attribution container */
 .leaflet-container {
   font-family: inherit !important;
+  background-color: #f1f5f9 !important;
+}
+
+.dark .leaflet-container {
   background-color: #020617 !important;
 }
 
 .leaflet-control-attribution {
-  font-size: 9px !important;
-  background: rgba(2, 6, 23, 0.8) !important;
-  color: #94a3b8 !important;
-  border-radius: 4px;
-  padding: 2px 6px;
+  font-size: 8px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #475569 !important;
+  border-radius: 6px;
+  padding: 1px 6px;
+  backdrop-filter: blur(8px);
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(2, 6, 23, 0.75) !important;
+  color: #64748b !important;
 }
 
 .leaflet-control-attribution a {
+  color: #d97706 !important;
+}
+
+.dark .leaflet-control-attribution a {
   color: #fbbf24 !important;
 }
 
-/* Short bounce animation for incoming request popup */
-@keyframes bounceShort {
+/* Pulse animation for radar search */
+@keyframes pulseSubtle {
   0%, 100% {
-    transform: translateY(0);
+    transform: scale(1);
+    opacity: 1;
   }
   50% {
-    transform: translateY(-8px);
+    transform: scale(1.03);
+    opacity: 0.92;
   }
 }
 
-.animate-bounce-short {
-  animation: bounceShort 1.5s infinite;
+.animate-pulse-subtle {
+  animation: pulseSubtle 2s infinite ease-in-out;
 }
