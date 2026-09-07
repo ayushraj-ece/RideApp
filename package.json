@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.115.0",
     "@tailwindcss/postcss": "^4.3.3",
@@ -27,5 +29,8 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.1"
   }
 }

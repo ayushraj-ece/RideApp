@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Message, UserRole } from '@/types/ride';
 import { soundEffects } from '@/lib/audio/soundEffects';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import {
   Send,
   X,
@@ -33,6 +34,7 @@ export default function ChatDrawer({
   isOpen,
   onClose,
 }: ChatDrawerProps) {
+  const { theme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ export default function ChatDrawer({
     subtitle: string;
   }>({
     name: recipientName || (currentUserRole === 'CUSTOMER' ? 'Captain' : 'Customer'),
-    phone: recipientPhone || '+91 98765 43210',
+    phone: recipientPhone || '',
     subtitle: currentUserRole === 'CUSTOMER' ? 'Captain • Active' : 'Customer • Active',
   });
 
@@ -69,39 +71,49 @@ export default function ChatDrawer({
           'Please come outside',
         ];
 
-  // Fetch partner info & existing messages
+  // Fetch registered partner info & existing messages
   useEffect(() => {
     if (!rideId || !isOpen) return;
 
     const fetchDetails = async () => {
-      // 1. Fetch Ride & Partner Details if not fully passed
+      // 1. Fetch Ride & Registered Profile Details
       const { data: rideData } = await supabase
         .from('rides')
         .select(`
           *,
           customer:profiles!rides_customer_id_fkey(id, name, phone),
-          captain:captains!rides_captain_id_fkey(
-            id, vehicle_type, vehicle_number, vehicle_model,
-            profile:profiles(id, name, phone)
-          )
+          captain_profile:profiles!rides_captain_id_fkey(id, name, phone)
         `)
         .eq('id', rideId)
         .single();
 
       if (rideData) {
         if (currentUserRole === 'CUSTOMER') {
-          const captProf = (rideData as any).captain?.profile;
-          const captObj = (rideData as any).captain;
+          const captProf = (rideData as any).captain_profile;
+          let subtitle = 'Captain • Online';
+
+          if (rideData.captain_id) {
+            const { data: captObj } = await supabase
+              .from('captains')
+              .select('vehicle_model, vehicle_number')
+              .eq('id', rideData.captain_id)
+              .maybeSingle();
+
+            if (captObj) {
+              subtitle = `${captObj.vehicle_model} (${captObj.vehicle_number})`;
+            }
+          }
+
           setPartnerInfo({
             name: captProf?.name || recipientName || 'Captain',
-            phone: captProf?.phone || recipientPhone || '+91 98765 43210',
-            subtitle: captObj ? `${captObj.vehicle_model} (${captObj.vehicle_number})` : 'Captain • Online',
+            phone: captProf?.phone || recipientPhone || '',
+            subtitle,
           });
         } else {
           const custProf = (rideData as any).customer;
           setPartnerInfo({
             name: custProf?.name || recipientName || 'Customer',
-            phone: custProf?.phone || recipientPhone || '+91 98765 43210',
+            phone: custProf?.phone || recipientPhone || '',
             subtitle: 'Customer • Active Ride',
           });
         }
@@ -175,38 +187,43 @@ export default function ChatDrawer({
   };
 
   const handleCall = () => {
-    const cleanNum = partnerInfo.phone.replace(/[^0-9+]/g, '');
-    window.location.href = `tel:${cleanNum || '+919876543210'}`;
+    const rawNum = partnerInfo.phone || recipientPhone || '';
+    const cleanNum = rawNum.replace(/[^0-9+]/g, '');
+    if (cleanNum) {
+      window.location.href = `tel:${cleanNum}`;
+    } else {
+      alert(`No registered phone number found for ${partnerInfo.name}.`);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-md transition-opacity">
-      <div className="flex h-full w-full max-w-md flex-col bg-slate-950 text-white shadow-2xl border-l border-slate-800 animate-in slide-in-from-right duration-200">
+      <div className="flex h-full w-full max-w-md flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 shadow-2xl border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-200 font-sans">
         
-        {/* HEADER: Partner Info & Call Button */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3.5 bg-slate-900/90 backdrop-blur-xl">
+        {/* HEADER: Registered Partner Info & Call Button */}
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 px-4 py-3.5 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-xl">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0">
-              <div className="h-10 w-10 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold shadow-inner">
+              <div className="h-10 w-10 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-500 font-bold shadow-inner">
                 {currentUserRole === 'CUSTOMER' ? <Bike className="h-5 w-5" /> : <User className="h-5 w-5" />}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-slate-950" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-950" />
             </div>
 
             <div className="min-w-0">
-              <h3 className="font-extrabold text-slate-100 text-sm truncate">{partnerInfo.name}</h3>
-              <p className="text-[11px] text-slate-400 truncate font-medium">{partnerInfo.subtitle}</p>
+              <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm truncate">{partnerInfo.name}</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-medium">{partnerInfo.subtitle}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* CALL BUTTON */}
+            {/* CALL BUTTON (USES REGISTERED PHONE NUMBER) */}
             <button
               onClick={handleCall}
               title={`Call ${partnerInfo.name}`}
-              className="flex items-center gap-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-1.5 text-xs font-extrabold shadow-md transition-transform active:scale-95"
+              className="flex items-center gap-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3.5 py-1.5 text-xs font-extrabold shadow-md transition-transform active:scale-95 cursor-pointer"
             >
               <Phone className="h-3.5 w-3.5 fill-slate-950" />
               <span>Call</span>
@@ -215,7 +232,7 @@ export default function ChatDrawer({
             {/* CLOSE BUTTON */}
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              className="rounded-full p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -223,12 +240,12 @@ export default function ChatDrawer({
         </div>
 
         {/* QUICK REPLIES BAR */}
-        <div className="p-2.5 bg-slate-900/40 border-b border-slate-800/60 overflow-x-auto flex gap-2 scrollbar-none">
+        <div className="p-2.5 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800/60 overflow-x-auto flex gap-2 scrollbar-none">
           {quickReplies.map((chip, idx) => (
             <button
               key={idx}
               onClick={() => handleSendMessage(chip)}
-              className="px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-amber-500/20 hover:border-amber-500/40 border border-slate-700/60 text-[11px] font-semibold text-slate-300 hover:text-amber-400 whitespace-nowrap transition-colors"
+              className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-400/20 hover:border-amber-400/40 border border-slate-200 dark:border-slate-700/60 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-500 whitespace-nowrap transition-colors cursor-pointer"
             >
               {chip}
             </button>
@@ -236,15 +253,15 @@ export default function ChatDrawer({
         </div>
 
         {/* MESSAGE FEED */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-950/60">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/50 dark:bg-slate-950/60">
           {messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center text-slate-500 text-xs space-y-2 p-6">
-              <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center text-amber-400 border border-slate-800">
+              <div className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-amber-500 border border-slate-200 dark:border-slate-800">
                 <MessageSquare className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-bold text-slate-300">Start Conversation</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Send a message or tap a quick response chip above to reach out.</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">Start Conversation</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Send a message or tap a quick response chip above to reach out.</p>
               </div>
             </div>
           ) : (
@@ -261,14 +278,14 @@ export default function ChatDrawer({
                   className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
                   <span className="text-[9px] text-slate-400 px-1 mb-1 font-bold">
-                    {msg.sender_role === 'CAPTAIN' ? 'Captain' : 'Customer'}
+                    {isMe ? 'You' : partnerInfo.name}
                   </span>
 
                   <div
                     className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-xs shadow-md space-y-1 ${
                       isMe
                         ? 'bg-amber-400 text-slate-950 font-bold rounded-br-none'
-                        : 'bg-slate-900 text-slate-100 border border-slate-800 rounded-bl-none'
+                        : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-bl-none'
                     }`}
                   >
                     <p className="leading-relaxed">{msg.message}</p>
@@ -290,19 +307,19 @@ export default function ChatDrawer({
             e.preventDefault();
             handleSendMessage();
           }}
-          className="border-t border-slate-800/80 p-3 bg-slate-900/90 flex gap-2"
+          className="border-t border-slate-200 dark:border-slate-800/80 p-3 bg-white dark:bg-slate-900/90 flex gap-2"
         >
           <input
             type="text"
             placeholder="Type your message..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 rounded-2xl bg-slate-800/80 border border-slate-700/60 px-4 py-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+            className="flex-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 px-4 py-3 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
           />
           <button
             type="submit"
             disabled={!newMessage.trim() || loading}
-            className="flex items-center justify-center rounded-2xl bg-amber-400 px-4.5 py-3 font-extrabold text-slate-950 hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-transform active:scale-95 shadow-md shrink-0"
+            className="flex items-center justify-center rounded-2xl bg-amber-400 px-4.5 py-3 font-extrabold text-slate-950 hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed transition-transform active:scale-95 shadow-md shrink-0 cursor-pointer"
           >
             <Send className="h-4 w-4" />
           </button>

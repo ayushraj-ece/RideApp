@@ -1,0 +1,9 @@
+{
+  "appId": "com.rideon.captain",
+  "appName": "RideOn Captain",
+  "webDir": "dist_captain",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
