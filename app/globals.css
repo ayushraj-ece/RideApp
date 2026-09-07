@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950;
+  }
+}
+
+/* Custom Leaflet Map Icon Styling */
+.custom-map-icon {
+  background: transparent;
+  border: none;
+}
+
+/* Custom Leaflet attribution container */
+.leaflet-container {
+  font-family: inherit !important;
+  background-color: #020617 !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(2, 6, 23, 0.8) !important;
+  color: #94a3b8 !important;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.leaflet-control-attribution a {
+  color: #fbbf24 !important;
+}
+
+/* Short bounce animation for incoming request popup */
+@keyframes bounceShort {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-bounce-short {
+  animation: bounceShort 1.5s infinite;
+}
