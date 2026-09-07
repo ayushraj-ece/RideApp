@@ -192,32 +192,44 @@ export default function CaptainHomePage() {
     initCaptain();
   }, []);
 
-  // 2. GPS Location Tracker loop when Online
+  // 2. High-Accuracy GPS Location Tracker & Real-Time Sync Loop
   useEffect(() => {
-    if (!isOnline || !captain || typeof window === 'undefined' || !navigator.geolocation) return;
+    if ((!isOnline && !activeRide) || !captain || typeof window === 'undefined' || !navigator.geolocation) return;
+
+    const syncLocation = (lat: number, lng: number) => {
+      const coords: [number, number] = [lat, lng];
+      setGpsCoords(coords);
+
+      supabase.rpc('update_captain_location', {
+        p_captain_id: captain.id,
+        p_lat: lat,
+        p_lng: lng,
+      });
+
+      if (activeRide) {
+        updateRouteForRide(activeRide, coords);
+      }
+    };
 
     const watchId = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const coords: [number, number] = [lat, lng];
-        setGpsCoords(coords);
-
-        await supabase.rpc('update_captain_location', {
-          p_captain_id: captain.id,
-          p_lat: lat,
-          p_lng: lng,
-        });
-
-        if (activeRide) {
-          updateRouteForRide(activeRide, coords);
-        }
-      },
-      (err) => console.warn('GPS error:', err),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude),
+      (err) => console.warn('GPS watch error:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    // 3-Second High-Frequency Interval Fallback for Continuous Realtime Broadcasting
+    const syncInterval = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude),
+        null,
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+      );
+    }, 3000);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(syncInterval);
+    };
   }, [isOnline, captain?.id, activeRide?.id]);
 
   const updateRouteForRide = async (ride: Ride, currentPos: [number, number] | null) => {

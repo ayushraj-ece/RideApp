@@ -528,6 +528,42 @@ export default function CustomerHomePage() {
     };
   }, [activeRide?.captain_id, activeRide?.status]);
 
+  // 3-Second High-Frequency Live Ride & Captain Location Sync Loop (Zero Page Refresh)
+  useEffect(() => {
+    if (!activeRide) return;
+
+    const interval = setInterval(async () => {
+      const { data: rideData } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('id', activeRide.id)
+        .single();
+
+      if (rideData) {
+        const updatedRide = rideData as Ride;
+        setActiveRide((prev) => (prev?.status !== updatedRide.status ? updatedRide : prev));
+
+        if (updatedRide.captain_id) {
+          if (!assignedCaptain || assignedCaptain.id !== updatedRide.captain_id) {
+            fetchCaptainDetails(updatedRide.captain_id);
+          }
+
+          const { data: captData } = await supabase
+            .from('captains')
+            .select('latitude, longitude')
+            .eq('id', updatedRide.captain_id)
+            .single();
+
+          if (captData && captData.latitude && captData.longitude) {
+            setCaptainLiveLocation([captData.latitude, captData.longitude]);
+          }
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeRide?.id, activeRide?.status, activeRide?.captain_id, assignedCaptain?.id]);
+
   const handleCancelRide = async (reason = 'Cancelled by customer') => {
     if (!activeRide || !user) return;
 

@@ -81,11 +81,11 @@ export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
 }
 
 /**
- * Reverse geocoding lat/lng to display address using Nominatim
+ * High-accuracy reverse geocoding lat/lng to display address using Nominatim
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Rideon/1.0',
@@ -94,7 +94,20 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 
     if (!res.ok) throw new Error('Reverse geocoding error');
     const data = await res.json();
-    return data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+    if (data && data.address) {
+      const a = data.address;
+      const point = a.building || a.amenity || a.shop || a.road || a.pedestrian || a.suburb || '';
+      const area = a.suburb || a.neighbourhood || a.residential || a.city_district || '';
+      const city = a.city || a.town || a.county || a.state || '';
+
+      const parts = [point, area, city].filter(Boolean);
+      if (parts.length >= 2) {
+        return parts.join(', ');
+      }
+    }
+
+    return data.display_name || `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
   } catch (error) {
     return `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
   }
