@@ -838,9 +838,9 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* DOCKED BOTTOM BOOKING SHEET (FLUSH AT BOTTOM EDGE) */}
+        {/* DOCKED BOTTOM BOOKING SHEET (POSITIONED ABOVE BOTTOM NAV WHEN !activeRide) */}
         {!isSearchOverlayOpen && (
-          <div className={`fixed inset-x-0 z-30 max-w-lg mx-auto w-full pointer-events-auto ${activeRide ? 'bottom-0' : 'bottom-0 sm:bottom-4'}`}>
+          <div className={`fixed inset-x-0 z-30 max-w-lg mx-auto w-full pointer-events-auto ${activeRide ? 'bottom-0' : 'bottom-[56px] sm:bottom-16'}`}>
             {/* CASE A: SEARCHING FOR CAPTAIN */}
             {activeRide?.status === 'SEARCHING' && (
               <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-center space-y-4 max-h-[82vh] overflow-y-auto overscroll-contain">
@@ -1063,7 +1063,7 @@ export default function CustomerHomePage() {
 
             {/* CASE C: RAPIDO SCREENSHOT 2 (HOME) & SCREENSHOT 4 (BOOKING) */}
             {!activeRide && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl max-h-[82vh] sm:max-h-[75vh] flex flex-col overflow-hidden shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)]">
+              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl max-h-[68vh] sm:max-h-[72vh] flex flex-col overflow-hidden shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)]">
                 {/* SEARCH ENTRY BAR (PINNED AT TOP) */}
                 <button
                   onClick={() => {
