@@ -818,10 +818,10 @@ export default function CustomerHomePage() {
 
         {/* DOCKED BOTTOM BOOKING SHEET (MATCHING SCREENSHOT 4 RAPIDO UI) */}
         {!isSearchOverlayOpen && (
-          <div className="absolute inset-x-0 bottom-14 z-20 max-w-lg mx-auto w-full pointer-events-auto">
+          <div className="fixed inset-x-0 bottom-[56px] sm:bottom-16 z-20 max-w-lg mx-auto w-full pointer-events-auto px-2 sm:px-0">
             {/* CASE A: SEARCHING FOR CAPTAIN */}
             {activeRide?.status === 'SEARCHING' && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-center space-y-4">
+              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-center space-y-4 max-h-[82vh] overflow-y-auto overscroll-contain">
                 <div className="relative mx-auto flex h-14 w-14 items-center justify-center">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-70"></span>
                   <div className="relative h-11 w-11 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-950 font-bold shadow-lg">
@@ -864,7 +864,7 @@ export default function CustomerHomePage() {
 
             {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
             {activeRide && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[70vh] overflow-y-auto">
+              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[82vh] overflow-y-auto overscroll-contain">
                 {/* TOP STATUS BAR & OTP BADGE */}
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
                   <div>
@@ -1010,14 +1010,14 @@ export default function CustomerHomePage() {
 
             {/* CASE C: RAPIDO SCREENSHOT 2 (HOME) & SCREENSHOT 4 (BOOKING) */}
             {!activeRide && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-8 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[60vh] sm:max-h-[65vh] overflow-y-auto overscroll-contain shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)]">
-                {/* SEARCH ENTRY BAR (MATCHING SCREENSHOT 2 & 3 RAPIDO) */}
+              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl max-h-[82vh] sm:max-h-[75vh] flex flex-col overflow-hidden shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)]">
+                {/* SEARCH ENTRY BAR (PINNED AT TOP) */}
                 <button
                   onClick={() => {
                     setActiveSelectTab('DESTINATION');
                     setIsSearchOverlayOpen(true);
                   }}
-                  className="w-full flex items-center justify-between p-3.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 font-semibold shadow-sm hover:border-amber-500 transition-colors"
+                  className="w-full shrink-0 mb-3 flex items-center justify-between p-3.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 font-semibold shadow-sm hover:border-amber-500 transition-colors"
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Search className="h-4 w-4 text-slate-400 shrink-0" />
@@ -1043,8 +1043,8 @@ export default function CustomerHomePage() {
                 </button>
 
                 {!destinationCoords ? (
-                  /* CASE C1: HOME SCREEN - RECENT HISTORIES & QUICK SERVICES (MATCHING SCREENSHOT 2 RAPIDO UI) */
-                  <div className="space-y-4 pt-1">
+                  /* CASE C1: HOME SCREEN - RECENT HISTORIES & QUICK SERVICES */
+                  <div className="flex-1 overflow-y-auto overscroll-contain space-y-4 pr-0.5 pb-2">
                     {/* RECENT RIDE HISTORY */}
                     {recentLocations.length > 0 ? (
                       <div className="space-y-1">
@@ -1106,10 +1106,10 @@ export default function CustomerHomePage() {
                     </div>
                   </div>
                 ) : (
-                  /* CASE C2: DESTINATION SELECTED - REAL CALCULATED VEHICLE FARES & BOOKING SHEET (MATCHING SCREENSHOT 4 RAPIDO UI) */
-                  <div className="space-y-3 pt-1">
-                    {/* STACKED CLEAN VEHICLE LIST ROWS */}
-                    <div className="space-y-1.5">
+                  /* CASE C2: DESTINATION SELECTED - STICKY BOOK NOW BUTTON & SCROLLABLE VEHICLE LIST */
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* SCROLLABLE VEHICLE OPTIONS LIST */}
+                    <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 space-y-2 pr-0.5 py-1">
                       {(['BIKE', 'AUTO', 'CAB'] as VehicleType[]).map((vType) => {
                         const cfg = VEHICLE_CONFIGS[vType];
                         const breakdown = getFareBreakdown(distanceKm, vType);
@@ -1157,8 +1157,8 @@ export default function CustomerHomePage() {
                       })}
                     </div>
 
-                    {/* BOTTOM ACTION BAR: Cash > + Book Now Yellow CTA */}
-                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    {/* PINNED / STICKY BOTTOM ACTION BAR: Cash Selector + BOOK NOW CTA */}
+                    <div className="shrink-0 pt-2.5 mt-1 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 z-10 flex items-center gap-3">
                       <div className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shrink-0">
                         <DollarSign className="h-4 w-4 text-emerald-500" />
                         <span>Cash</span>
