@@ -183,3 +183,17 @@ export function calculateFare(
 ): number {
   return getFareBreakdown(distanceKm, vehicleType, overrideSurge).totalFare;
 }
+
+/**
+ * Generates a permanent, account-bound unique 4-digit ride PIN/OTP for a user.
+ */
+export function getPermanentUserOtp(userId: string): string {
+  if (!userId) return '1234';
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash << 5) - hash + userId.charCodeAt(i);
+    hash |= 0;
+  }
+  const code = (Math.abs(hash) % 9000) + 1000;
+  return code.toString();
+}

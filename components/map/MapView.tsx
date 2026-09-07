@@ -63,14 +63,12 @@ export default function MapView({
       center,
       zoom,
       zoomControl: false,
+      attributionControl: false,
     });
 
     L.tileLayer(MAP_CONFIG.tileUrl, {
-      attribution: MAP_CONFIG.attribution,
       maxZoom: 19,
     }).addTo(map);
-
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       if (onMapClickRef.current) {

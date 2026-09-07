@@ -9,6 +9,7 @@ import RatingModal from '@/components/ride/RatingModal';
 import SafetySheet from '@/components/ride/SafetySheet';
 import ProfileDrawer from '@/components/profile/ProfileDrawer';
 import CustomerBottomNav from '@/components/ui/CustomerBottomNav';
+import CancelRideModal from '@/components/ride/CancelRideModal';
 import { createClient } from '@/lib/supabase/client';
 import { Ride, VehicleType, UserProfile, CaptainProfile } from '@/types/ride';
 import {
@@ -16,6 +17,7 @@ import {
   calculateEstimatedTimeMinutes,
   FareBreakdown,
   VEHICLE_CONFIGS,
+  getPermanentUserOtp,
 } from '@/lib/pricing/fareEngine';
 import {
   searchGeocode,
@@ -147,6 +149,7 @@ export default function CustomerHomePage() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isParcelModalOpen, setIsParcelModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'RIDE' | 'PARCEL' | 'PROFILE'>('RIDE');
 
   // 1. Authenticate user & check active ride
@@ -412,7 +415,7 @@ export default function CustomerHomePage() {
     if (!user || !pickupCoords || !destinationCoords) return;
 
     setBookingLoading(true);
-    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const otpCode = getPermanentUserOtp(user.id);
     const fareBreakdown = getFareBreakdown(distanceKm, selectedVehicle);
 
     try {
@@ -562,9 +565,15 @@ export default function CustomerHomePage() {
 
   if (loadingUser) {
     return (
-      <div className="h-screen bg-slate-100 dark:bg-slate-950 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 font-sans">
-        <Loader2 className="h-7 w-7 animate-spin text-amber-500 mb-2" />
-        <p className="text-xs font-bold tracking-wider uppercase">Loading Rideon App...</p>
+      <div className="h-screen bg-slate-950 flex flex-col items-center justify-center text-white font-sans">
+        <div className="h-16 w-16 rounded-3xl bg-amber-500 flex items-center justify-center text-slate-950 font-black mb-4 shadow-2xl animate-bounce">
+          <Bike className="h-10 w-10" />
+        </div>
+        <h1 className="text-3xl font-black tracking-wider text-amber-400 mb-1">RIDEON</h1>
+        <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">
+          <Loader2 className="h-4 w-4 animate-spin text-amber-500" />
+          <span>Connecting your ride...</span>
+        </div>
       </div>
     );
   }
@@ -633,23 +642,22 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* Floating Action Buttons during Active Ride */}
-        {activeRide && (
+        {/* Floating Action Buttons during Active Ride (ONLY WHEN CAPTAIN IS ASSIGNED) */}
+        {activeRide && activeRide.captain_id && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
           <div className="absolute top-4 right-4 z-20 flex flex-col gap-2.5 pointer-events-auto">
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="flex items-center justify-center h-11 w-11 rounded-2xl bg-amber-500 text-slate-950 shadow-xl border border-white/20 hover:scale-105 transition-transform"
-              title="Chat with Captain"
-            >
-              <MessageSquare className="h-5 w-5" />
-            </button>
-
             <button
               onClick={() => setIsSafetyOpen(true)}
               className="flex items-center justify-center h-11 w-11 rounded-2xl bg-rose-600 text-white shadow-xl border border-white/20 hover:scale-105 transition-transform"
               title="Safety & SOS"
             >
               <Shield className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="flex items-center justify-center h-11 w-11 rounded-2xl bg-amber-400 text-slate-950 shadow-xl border border-white/20 hover:scale-105 transition-transform"
+              title="Chat with Captain"
+            >
+              <MessageSquare className="h-5 w-5" />
             </button>
           </div>
         )}
@@ -816,9 +824,9 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* DOCKED BOTTOM BOOKING SHEET (MATCHING SCREENSHOT 4 RAPIDO UI) */}
+        {/* DOCKED BOTTOM BOOKING SHEET (FLUSH AT BOTTOM EDGE) */}
         {!isSearchOverlayOpen && (
-          <div className="fixed inset-x-0 bottom-[56px] sm:bottom-16 z-20 max-w-lg mx-auto w-full pointer-events-auto px-2 sm:px-0">
+          <div className={`fixed inset-x-0 z-30 max-w-lg mx-auto w-full pointer-events-auto ${activeRide ? 'bottom-0' : 'bottom-0 sm:bottom-4'}`}>
             {/* CASE A: SEARCHING FOR CAPTAIN */}
             {activeRide?.status === 'SEARCHING' && (
               <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-center space-y-4 max-h-[82vh] overflow-y-auto overscroll-contain">
@@ -854,7 +862,7 @@ export default function CustomerHomePage() {
                 </div>
 
                 <button
-                  onClick={() => handleCancelRide('Customer cancelled search')}
+                  onClick={() => setIsCancelModalOpen(true)}
                   className="w-full rounded-2xl bg-slate-100 dark:bg-slate-900 py-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel Search
@@ -865,23 +873,39 @@ export default function CustomerHomePage() {
             {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
             {activeRide && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
               <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[82vh] overflow-y-auto overscroll-contain">
-                {/* TOP STATUS BAR & OTP BADGE */}
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                  <div>
-                    <span className="text-[9px] font-black tracking-wider uppercase px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                {/* SIMPLE STATUS & OTP HEADER (NO CLUTTER / NO HEAVY BORDERS) */}
+                <div className="space-y-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                       {activeRide.status.replace('_', ' ')}
                     </span>
-                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm mt-1.5">
+                    <span className="text-sm font-black text-slate-900 dark:text-slate-100">
+                      ₹{activeRide.estimated_fare}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
                       {activeRide.status === 'ACCEPTED' && 'Captain accepted your ride'}
                       {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain is on the way'}
                       {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain has arrived at pickup'}
                       {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Trip in progress'}
                     </h3>
-                  </div>
 
-                  <div className="rounded-2xl bg-amber-400 text-slate-950 px-3.5 py-2 text-center shadow-md">
-                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-900 opacity-90">START OTP</div>
-                    <div className="text-lg font-black tracking-widest font-mono text-slate-950">{activeRide.otp}</div>
+                    {/* CLEAN MINIMAL PIN DISPLAY (ONLY BEFORE TRIP STARTS) */}
+                    {!['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[11px] font-bold text-slate-400 mr-0.5">PIN</span>
+                        {(activeRide.otp || '0000').split('').map((digit, idx) => (
+                          <span
+                            key={idx}
+                            className="w-7 h-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
+                          >
+                            {digit}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -908,7 +932,6 @@ export default function CustomerHomePage() {
                         <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
                         <span>{assignedCaptain.rating_count > 0 ? (assignedCaptain.rating_sum / assignedCaptain.rating_count).toFixed(1) : '5.0'}</span>
                       </div>
-                      <p className="text-xs text-slate-900 dark:text-slate-100 font-black mt-1">₹{activeRide.estimated_fare}</p>
                     </div>
                   </div>
                 )}
@@ -987,22 +1010,13 @@ export default function CustomerHomePage() {
                   )}
                 </div>
 
-                {/* ACTION BUTTONS (CHAT & PROMINENT RED CANCEL BUTTON) */}
-                <div className="space-y-2 pt-1">
+                {/* CLEAN RED CANCEL BUTTON (NO ICONS, NO BIG CHAT BUTTON) */}
+                <div className="pt-1">
                   <button
-                    onClick={() => setIsChatOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-xs font-extrabold text-slate-950 hover:bg-amber-300 transition-transform active:scale-[0.99] shadow-md"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="w-full rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 text-xs transition-colors shadow-sm"
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    <span>Chat with Captain</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleCancelRide()}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 py-3.5 text-xs font-extrabold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-colors shadow-sm"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    <span>Cancel Ride</span>
+                    Cancel Ride
                   </button>
                 </div>
               </div>
@@ -1188,32 +1202,34 @@ export default function CustomerHomePage() {
         )}
       </div>
 
-      {/* PERSISTENT MOBILE BOTTOM NAVIGATION BAR (NEVER DISAPPEARS) */}
-      <CustomerBottomNav
-        activeTab={
-          isProfileOpen
-            ? 'PROFILE'
-            : isParcelModalOpen
-            ? 'PARCEL'
-            : activeBottomTab
-        }
-        onTabSelect={(tab) => {
-          setActiveBottomTab(tab);
-          if (tab === 'RIDE') {
-            setIsSearchOverlayOpen(false);
-            setIsParcelModalOpen(false);
-            setIsProfileOpen(false);
-          } else if (tab === 'PARCEL') {
-            setIsSearchOverlayOpen(false);
-            setIsProfileOpen(false);
-            setIsParcelModalOpen(true);
-          } else if (tab === 'PROFILE') {
-            setIsSearchOverlayOpen(false);
-            setIsParcelModalOpen(false);
-            setIsProfileOpen(true);
+      {/* MOBILE BOTTOM NAVIGATION BAR (HIDDEN DURING ACTIVE RIDES LIKE RAPIDO) */}
+      {!activeRide && (
+        <CustomerBottomNav
+          activeTab={
+            isProfileOpen
+              ? 'PROFILE'
+              : isParcelModalOpen
+              ? 'PARCEL'
+              : activeBottomTab
           }
-        }}
-      />
+          onTabSelect={(tab) => {
+            setActiveBottomTab(tab);
+            if (tab === 'RIDE') {
+              setIsSearchOverlayOpen(false);
+              setIsParcelModalOpen(false);
+              setIsProfileOpen(false);
+            } else if (tab === 'PARCEL') {
+              setIsSearchOverlayOpen(false);
+              setIsProfileOpen(false);
+              setIsParcelModalOpen(true);
+            } else if (tab === 'PROFILE') {
+              setIsSearchOverlayOpen(false);
+              setIsParcelModalOpen(false);
+              setIsProfileOpen(true);
+            }
+          }}
+        />
+      )}
 
       {/* Profile Drawer */}
       <ProfileDrawer
@@ -1322,6 +1338,17 @@ export default function CustomerHomePage() {
           onClose={() => setShowRatingModal(false)}
         />
       )}
+
+      {/* Cancel Ride Modal with Reasons & Green/Red Confirmation */}
+      <CancelRideModal
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        onConfirmCancel={(reason) => {
+          setIsCancelModalOpen(false);
+          handleCancelRide(reason);
+        }}
+        role="CUSTOMER"
+      />
     </div>
   );
 }
