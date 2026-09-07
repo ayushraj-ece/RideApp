@@ -470,11 +470,26 @@ export default function CaptainHomePage() {
             center={gpsCoords || [28.6139, 77.209]}
             zoom={15}
             captainLocation={gpsCoords}
+            captainVehicleType={captain?.vehicle_type || 'BIKE'}
             pickupLocation={activeRide ? [activeRide.pickup_lat, activeRide.pickup_lng] : null}
             destinationLocation={activeRide ? [activeRide.destination_lat, activeRide.destination_lng] : null}
             routeCoordinates={routeCoords}
           />
         </div>
+
+        {/* FLOATING LOCATE ME BUTTON FOR CAPTAIN */}
+        <button
+          onClick={() => {
+            detectCaptainLocation();
+            if (gpsCoords) {
+              setGpsCoords([...gpsCoords]);
+            }
+          }}
+          title="Center map on my location"
+          className="absolute bottom-28 right-4 z-30 p-3.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-amber-500 hover:bg-amber-400 hover:text-slate-950 shadow-2xl backdrop-blur-md transition-all active:scale-95 flex items-center justify-center pointer-events-auto cursor-pointer group"
+        >
+          <Crosshair className="h-5 w-5 animate-pulse group-hover:animate-none" />
+        </button>
 
         {/* UNIFIED RAPIDO TOP CAPTAIN DASHBOARD BAR */}
         <div className="absolute top-3 inset-x-3 sm:inset-x-4 z-20 max-w-lg mx-auto pointer-events-auto space-y-2">

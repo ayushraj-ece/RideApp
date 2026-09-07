@@ -13,6 +13,7 @@ interface MapViewProps {
   pickupLocation?: [number, number] | null;
   destinationLocation?: [number, number] | null;
   captainLocation?: [number, number] | null;
+  captainVehicleType?: VehicleType;
   nearbyCaptains?: Array<{
     id: string;
     latitude: number;
@@ -38,6 +39,7 @@ export default function MapView({
   pickupLocation,
   destinationLocation,
   captainLocation,
+  captainVehicleType = 'BIKE',
   nearbyCaptains = [],
   routeCoordinates = [],
   onMapClick,
@@ -106,10 +108,12 @@ export default function MapView({
       map.fitBounds(bounds, { padding: [70, 70], maxZoom: 16, animate: true });
     } else if (pickupLocation) {
       map.setView(pickupLocation, 15, { animate: true });
+    } else if (captainLocation) {
+      map.setView(captainLocation, 16, { animate: true });
     } else if (center) {
-      map.setView(center, zoom);
+      map.setView(center, zoom, { animate: true });
     }
-  }, [center, zoom, pickupLocation, destinationLocation, routeCoordinates]);
+  }, [center, zoom, pickupLocation, destinationLocation, captainLocation, routeCoordinates]);
 
   // Render Markers & Polylines
   useEffect(() => {
@@ -188,20 +192,28 @@ export default function MapView({
       delete markersRef.current['destination'];
     }
 
-    // 4. Assigned Captain Live Marker (Gold Badge)
+    // 4. Captain Live Location Marker (Pulsing Radar Wave + Gold Badge + "YOU (CAPTAIN)")
     if (captainLocation) {
+      const svgIcon = VEHICLE_SVG_ICONS[captainVehicleType] || VEHICLE_SVG_ICONS['BIKE'];
       const icon = L.divIcon({
-        html: `<div class="bg-slate-900 border-2 border-amber-400 text-amber-400 rounded-full p-2 shadow-2xl flex items-center justify-center">
-            ${VEHICLE_SVG_ICONS['BIKE']}
+        html: `<div class="relative flex items-center justify-center">
+            <span class="animate-ping absolute inline-flex h-11 w-11 rounded-full bg-amber-400 opacity-50"></span>
+            <div class="relative flex items-center justify-center bg-slate-950 border-2 border-amber-400 text-amber-400 rounded-full p-2 shadow-2xl">
+              ${svgIcon}
+            </div>
+            <div class="absolute -bottom-4 bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shadow-md border border-white">
+              YOU (CAPTAIN)
+            </div>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
       if (!markersRef.current['captain_assigned']) {
         markersRef.current['captain_assigned'] = L.marker(captainLocation, { icon }).addTo(map);
       } else {
+        markersRef.current['captain_assigned'].setIcon(icon);
         markersRef.current['captain_assigned'].setLatLng(captainLocation);
       }
     } else if (markersRef.current['captain_assigned']) {
