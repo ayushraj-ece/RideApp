@@ -43,6 +43,8 @@ export interface CaptainProfile {
   last_location_update: string | null;
   rating_sum: number;
   rating_count: number;
+  accepts_rides?: boolean;
+  accepts_parcels?: boolean;
   created_at?: string;
 }
 
@@ -68,6 +70,8 @@ export interface Ride {
   estimated_fare: number;
   final_fare: number | null;
   otp: string;
+  drop_otp?: string;
+  is_parcel?: boolean;
   cancelled_by: string | null;
   cancel_reason: string | null;
   created_at: string;

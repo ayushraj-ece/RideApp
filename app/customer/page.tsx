@@ -18,6 +18,7 @@ import {
   FareBreakdown,
   VEHICLE_CONFIGS,
   getPermanentUserOtp,
+  generateRandomOtp,
 } from '@/lib/pricing/fareEngine';
 import {
   searchGeocode,
@@ -416,7 +417,9 @@ export default function CustomerHomePage() {
     if (!user || !pickupCoords || !destinationCoords) return;
 
     setBookingLoading(true);
-    const otpCode = getPermanentUserOtp(user.id);
+    const isParcelOrder = activeBottomTab === 'PARCEL' || isParcelModalOpen;
+    const otpCode = isParcelOrder ? generateRandomOtp() : getPermanentUserOtp(user.id);
+    const dropOtpCode = isParcelOrder ? generateRandomOtp() : undefined;
     const fareBreakdown = getFareBreakdown(distanceKm, selectedVehicle);
 
     try {
@@ -435,6 +438,8 @@ export default function CustomerHomePage() {
           distance_km: distanceKm,
           estimated_fare: fareBreakdown.totalFare,
           otp: otpCode,
+          drop_otp: dropOtpCode,
+          is_parcel: isParcelOrder,
         })
         .select()
         .single();
@@ -923,12 +928,21 @@ export default function CustomerHomePage() {
             {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
             {activeRide && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
               <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[82vh] overflow-y-auto overscroll-contain">
-                {/* SIMPLE STATUS & OTP HEADER (NO CLUTTER / NO HEAVY BORDERS) */}
+                {/* SIMPLE STATUS & OTP HEADER (PARCEL vs RIDE DISTINCTION) */}
                 <div className="space-y-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                      {activeRide.status.replace('_', ' ')}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {activeRide.is_parcel ? (
+                        <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          PARCEL DELIVERY
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          {activeRide.status.replace('_', ' ')}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-sm font-black text-slate-900 dark:text-slate-100">
                       ₹{activeRide.estimated_fare}
                     </span>
@@ -936,27 +950,60 @@ export default function CustomerHomePage() {
 
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
-                      {activeRide.status === 'ACCEPTED' && 'Captain accepted your ride'}
-                      {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain is on the way'}
-                      {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain has arrived at pickup'}
-                      {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Trip in progress'}
+                      {activeRide.is_parcel ? (
+                        <>
+                          {activeRide.status === 'ACCEPTED' && 'Captain accepted your parcel delivery'}
+                          {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain on the way for package pickup'}
+                          {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain arrived for package pickup'}
+                          {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Parcel in transit to drop location'}
+                        </>
+                      ) : (
+                        <>
+                          {activeRide.status === 'ACCEPTED' && 'Captain accepted your ride'}
+                          {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain is on the way'}
+                          {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain has arrived at pickup'}
+                          {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Trip in progress'}
+                        </>
+                      )}
                     </h3>
 
-                    {/* CLEAN MINIMAL PIN DISPLAY (ONLY BEFORE TRIP STARTS) */}
-                    {!['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[11px] font-bold text-slate-400 mr-0.5">PIN</span>
-                        {(activeRide.otp || '0000').split('').map((digit, idx) => (
-                          <span
-                            key={idx}
-                            className="w-7 h-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
-                          >
-                            {digit}
-                          </span>
-                        ))}
+                    {/* DYNAMIC OTP DISPLAY: RANDOM FOR PARCEL PICKUP/DROP vs PERMANENT FOR RIDES */}
+                    {!['COMPLETED'].includes(activeRide.status) && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-slate-400">PICKUP PIN</span>
+                            {(activeRide.otp || '0000').split('').map((digit, idx) => (
+                              <span
+                                key={idx}
+                                className="w-6 h-7 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
+                              >
+                                {digit}
+                              </span>
+                            ))}
+                          </div>
+                        ) : activeRide.is_parcel && activeRide.drop_otp ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-emerald-500">DROP PIN</span>
+                            {(activeRide.drop_otp || '0000').split('').map((digit, idx) => (
+                              <span
+                                key={idx}
+                                className="w-6 h-7 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/30"
+                              >
+                                {digit}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     )}
                   </div>
+
+                  {activeRide.is_parcel && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">
+                      📦 Max Package Weight: <strong>20 kg</strong> (Captain may reject oversized packages)
+                    </p>
+                  )}
 
                   {/* LIVE CAPTAIN DISTANCE FROM PICKUP & ETA BADGE */}
                   {(() => {

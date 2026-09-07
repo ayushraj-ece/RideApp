@@ -28,6 +28,8 @@ export default function CaptainProfileDrawer({
   const [vehicleNumber, setVehicleNumber] = useState(captain?.vehicle_number || '');
   const [vehicleModel, setVehicleModel] = useState(captain?.vehicle_model || '');
   const [licenseNumber, setLicenseNumber] = useState(captain?.license_number || '');
+  const [acceptsRides, setAcceptsRides] = useState<boolean>(captain?.accepts_rides !== false);
+  const [acceptsParcels, setAcceptsParcels] = useState<boolean>(captain?.accepts_parcels !== false);
   
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,6 +66,8 @@ export default function CaptainProfileDrawer({
           vehicle_number: vehicleNumber,
           vehicle_model: vehicleModel,
           license_number: licenseNumber,
+          accepts_rides: acceptsRides,
+          accepts_parcels: acceptsParcels,
         })
         .eq('id', captain.id);
 
@@ -76,6 +80,8 @@ export default function CaptainProfileDrawer({
         vehicle_number: vehicleNumber,
         vehicle_model: vehicleModel,
         license_number: licenseNumber,
+        accepts_rides: acceptsRides,
+        accepts_parcels: acceptsParcels,
       };
 
       onUpdate(updatedProf, updatedCapt);
@@ -236,6 +242,40 @@ export default function CaptainProfileDrawer({
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ORDER PREFERENCES SECTION (PASSENGER RIDES & PARCEL DELIVERIES) */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Order Preferences</h3>
+            <div className="space-y-2 text-xs">
+              <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptsRides}
+                  disabled={!isEditing}
+                  onChange={(e) => setAcceptsRides(e.target.checked)}
+                  className="h-4 w-4 rounded accent-amber-500"
+                />
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100">Passenger Rides</span>
+                  <p className="text-[11px] text-slate-500">Receive regular bike, auto, & cab booking requests</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptsParcels}
+                  disabled={!isEditing}
+                  onChange={(e) => setAcceptsParcels(e.target.checked)}
+                  className="h-4 w-4 rounded accent-amber-500"
+                />
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100">Parcel Deliveries</span>
+                  <p className="text-[11px] text-slate-500">Receive package pickup requests (Max 20kg limit)</p>
+                </div>
+              </label>
             </div>
           </div>
 

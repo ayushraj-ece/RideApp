@@ -39,6 +39,7 @@ import {
   XCircle,
   Phone,
   User,
+  Package,
 } from 'lucide-react';
 
 export default function CaptainHomePage() {
@@ -70,6 +71,8 @@ export default function CaptainHomePage() {
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
   const [otpInput, setOtpInput] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [dropOtpInput, setDropOtpInput] = useState('');
+  const [dropOtpError, setDropOtpError] = useState('');
 
   // Drawers & Modals
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -278,6 +281,12 @@ export default function CaptainHomePage() {
         async (payload) => {
           const ride = payload.new as Ride;
           if (ride.vehicle_type === captain.vehicle_type) {
+            const acceptsRide = captain.accepts_rides !== false;
+            const acceptsParcel = captain.accepts_parcels !== false;
+
+            if (ride.is_parcel && !acceptsParcel) return;
+            if (!ride.is_parcel && !acceptsRide) return;
+
             setIncomingRequest(ride);
             setRequestTimeout(30);
             soundEffects.playRideRequestChime();
@@ -377,9 +386,18 @@ export default function CaptainHomePage() {
     }
   };
 
-  const handleCompleteRide = async () => {
+  const handleCompleteRide = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!activeRide || !captain) return;
 
+    if (activeRide.is_parcel && activeRide.drop_otp) {
+      if (dropOtpInput.trim() !== activeRide.drop_otp.trim()) {
+        setDropOtpError('Invalid 4-digit Drop OTP! Ask recipient for the correct Drop OTP.');
+        return;
+      }
+    }
+
+    setDropOtpError('');
     const { data, error } = await supabase.rpc('complete_ride', {
       p_ride_id: activeRide.id,
       p_captain_id: captain.id,
@@ -388,9 +406,10 @@ export default function CaptainHomePage() {
     if (!error) {
       setTodayEarnings((prev) => prev + (activeRide.estimated_fare || 0));
       setCompletedTripsCount((prev) => prev + 1);
-      alert(`Ride completed! Fare of ₹${activeRide.estimated_fare} recorded in your earnings.`);
+      alert(`${activeRide.is_parcel ? 'Parcel delivery' : 'Ride'} completed! Fare of ₹${activeRide.estimated_fare} recorded in your earnings.`);
       setActiveRide(null);
       setRouteCoords([]);
+      setDropOtpInput('');
     }
   };
 
@@ -573,10 +592,19 @@ export default function CaptainHomePage() {
             <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t-4 border-amber-500 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-slate-900 dark:text-slate-100 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping" />
-                  <h3 className="font-black text-xs tracking-wider uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4" />
-                    NEW RIDE REQUEST
+                  <span className={`h-2.5 w-2.5 rounded-full ${incomingRequest.is_parcel ? 'bg-indigo-500' : 'bg-amber-500'} animate-ping`} />
+                  <h3 className={`font-black text-xs tracking-wider uppercase ${incomingRequest.is_parcel ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-400'} flex items-center gap-1.5`}>
+                    {incomingRequest.is_parcel ? (
+                      <>
+                        <Package className="h-4 w-4" />
+                        PARCEL DELIVERY REQUEST
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        NEW RIDE REQUEST
+                      </>
+                    )}
                   </h3>
                 </div>
                 <div className="flex items-center gap-1 text-xs font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-xl border border-amber-500/20">
@@ -584,6 +612,13 @@ export default function CaptainHomePage() {
                   <span>{requestTimeout}s</span>
                 </div>
               </div>
+
+              {incomingRequest.is_parcel && (
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-semibold flex items-center gap-2">
+                  <Package className="h-4 w-4 shrink-0" />
+                  <span>Package limit: Max 20 kg. Captain can reject if package exceeds 20 kg.</span>
+                </div>
+              )}
 
               <div className="space-y-2 text-xs bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800/80">
                 <div className="flex items-start gap-2.5">
@@ -620,7 +655,7 @@ export default function CaptainHomePage() {
                   disabled={acceptingLoading}
                   className="rounded-2xl bg-amber-400 py-3.5 text-xs font-extrabold uppercase text-slate-950 hover:bg-amber-300 transition-colors flex items-center justify-center gap-1.5 shadow-md active:scale-[0.99]"
                 >
-                  {acceptingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'ACCEPT RIDE'}
+                  {acceptingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (incomingRequest.is_parcel ? 'ACCEPT PARCEL' : 'ACCEPT RIDE')}
                 </button>
               </div>
             </div>
@@ -632,13 +667,20 @@ export default function CaptainHomePage() {
               {/* HEADER STATUS BADGE & TITLE */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div>
-                  <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    {activeRide.status.replace('_', ' ')}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {activeRide.is_parcel && (
+                      <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                        <Package className="h-3 w-3" /> PARCEL
+                      </span>
+                    )}
+                    <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      {activeRide.status.replace('_', ' ')}
+                    </span>
+                  </div>
                   <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm mt-1.5">
-                    {activeRide.status === 'ACCEPTED' && 'Navigate to Pickup Location'}
-                    {activeRide.status === 'CAPTAIN_ARRIVED' && 'Verify 4-Digit OTP from Customer'}
-                    {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Driving to Destination'}
+                    {activeRide.status === 'ACCEPTED' && (activeRide.is_parcel ? 'Navigate to Parcel Pickup (Max 20kg)' : 'Navigate to Pickup Location')}
+                    {activeRide.status === 'CAPTAIN_ARRIVED' && (activeRide.is_parcel ? 'Enter Sender 4-Digit Pickup OTP' : 'Verify 4-Digit OTP from Customer')}
+                    {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (activeRide.is_parcel ? 'Transporting Parcel to Recipient' : 'Driving to Destination')}
                   </h3>
                 </div>
 
@@ -654,7 +696,9 @@ export default function CaptainHomePage() {
                     <User className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wider">Rider</span>
+                    <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wider">
+                      {activeRide.is_parcel ? 'Sender' : 'Rider'}
+                    </span>
                     <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-xs truncate">
                       {activeRide.customer?.name || 'Customer'}
                     </h4>
@@ -778,7 +822,9 @@ export default function CaptainHomePage() {
 
               {activeRide.status === 'CAPTAIN_ARRIVED' && (
                 <form onSubmit={handleVerifyOtp} className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Enter Customer 4-digit OTP</label>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {activeRide.is_parcel ? 'Enter Sender 4-digit Pickup OTP' : 'Enter Customer 4-digit OTP'}
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -792,21 +838,44 @@ export default function CaptainHomePage() {
                       type="submit"
                       className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 shadow-md"
                     >
-                      START
+                      {activeRide.is_parcel ? 'PICKUP PARCEL' : 'START RIDE'}
                     </button>
                   </div>
                   {otpError && <p className="text-xs text-rose-500 font-medium">{otpError}</p>}
                 </form>
               )}
 
-              {activeRide.status === 'IN_PROGRESS' && (
+              {activeRide.status === 'IN_PROGRESS' && activeRide.is_parcel ? (
+                <form onSubmit={handleCompleteRide} className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Enter Recipient 4-digit Drop OTP
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      value={dropOtpInput}
+                      onChange={(e) => setDropOtpInput(e.target.value)}
+                      placeholder="e.g. 5678"
+                      className="flex-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-center text-base font-mono font-bold tracking-widest text-indigo-600 dark:text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-emerald-500 px-5 py-2.5 text-xs font-extrabold text-slate-950 hover:bg-emerald-400 shadow-md shrink-0"
+                    >
+                      DELIVER PARCEL
+                    </button>
+                  </div>
+                  {dropOtpError && <p className="text-xs text-rose-500 font-medium">{dropOtpError}</p>}
+                </form>
+              ) : activeRide.status === 'IN_PROGRESS' ? (
                 <button
-                  onClick={handleCompleteRide}
+                  onClick={() => handleCompleteRide()}
                   className="w-full rounded-2xl bg-emerald-500 py-3.5 text-xs font-extrabold uppercase tracking-wider text-slate-950 hover:bg-emerald-400 transition-transform active:scale-[0.99] shadow-md"
                 >
                   COMPLETE RIDE & COLLECT ₹{activeRide.estimated_fare}
                 </button>
-              )}
+              ) : null}
 
               {/* RED CANCEL RIDE BUTTON IN CAPTAIN DASHBOARD */}
               <button

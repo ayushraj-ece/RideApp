@@ -197,3 +197,10 @@ export function getPermanentUserOtp(userId: string): string {
   const code = (Math.abs(hash) % 9000) + 1000;
   return code.toString();
 }
+
+/**
+ * Generates a dynamic random 4-digit OTP for parcel pickup & drop handoffs (no permanent OTP).
+ */
+export function generateRandomOtp(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
