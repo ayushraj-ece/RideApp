@@ -23,6 +23,7 @@ import {
   searchGeocode,
   reverseGeocode,
   getDirectionsRoute,
+  calculateHaversineDistance,
   MapSearchResult,
   POPULAR_LOCATIONS,
 } from '@/lib/maps';
@@ -659,6 +660,19 @@ export default function CustomerHomePage() {
             >
               <MessageSquare className="h-5 w-5" />
             </button>
+            <button
+              onClick={() => {
+                if (captainLiveLocation) {
+                  setUserCoords(captainLiveLocation);
+                } else if (pickupCoords) {
+                  setUserCoords(pickupCoords);
+                }
+              }}
+              className="flex items-center justify-center h-11 w-11 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-xl border border-slate-200 dark:border-slate-800 hover:scale-105 transition-transform"
+              title="Recenter & Pan Map to Live Location"
+            >
+              <Crosshair className="h-5 w-5 text-amber-500" />
+            </button>
           </div>
         )}
 
@@ -907,6 +921,31 @@ export default function CustomerHomePage() {
                       </div>
                     )}
                   </div>
+
+                  {/* LIVE CAPTAIN DISTANCE FROM PICKUP & ETA BADGE */}
+                  {(() => {
+                    if (!['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status) || !pickupCoords) {
+                      return null;
+                    }
+                    const captLat = captainLiveLocation ? captainLiveLocation[0] : (assignedCaptain?.latitude || pickupCoords[0] + 0.012);
+                    const captLng = captainLiveLocation ? captainLiveLocation[1] : (assignedCaptain?.longitude || pickupCoords[1] + 0.008);
+                    const distKm = calculateHaversineDistance(captLat, captLng, pickupCoords[0], pickupCoords[1]);
+                    const etaMins = Math.max(1, Math.ceil((distKm / 25) * 60));
+
+                    return (
+                      <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-4 w-4 animate-spin text-amber-500" />
+                          <span>
+                            {distKm < 0.1 ? 'Captain has arrived at pickup point' : `Arriving at pickup in ~${etaMins} mins`}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-amber-500/20">
+                          {distKm < 0.1 ? 'ARRIVED' : `${distKm} km away`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* CAPTAIN & VEHICLE CARD */}

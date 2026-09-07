@@ -64,6 +64,10 @@ export default function MapView({
       zoom,
       zoomControl: false,
       attributionControl: false,
+      dragging: true,
+      scrollWheelZoom: true,
+      touchZoom: true,
+      doubleClickZoom: true,
     });
 
     L.tileLayer(MAP_CONFIG.tileUrl, {
