@@ -19,7 +19,7 @@ export async function requestAndGetCurrentLocation(): Promise<[number, number] |
       maximumAge: 0,
     });
 
-    if (pos && pos.coords) {
+    if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
       return [pos.coords.latitude, pos.coords.longitude];
     }
   } catch (nativeErr) {
@@ -27,14 +27,20 @@ export async function requestAndGetCurrentLocation(): Promise<[number, number] |
   }
 
   // 2. Browser standard geolocation fallback
-  return new Promise(([resolve]: any) => {
+  return new Promise((resolve) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       resolve(null);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
+      (pos) => {
+        if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
+          resolve([pos.coords.latitude, pos.coords.longitude]);
+        } else {
+          resolve(null);
+        }
+      },
       (err) => {
         console.warn('Browser geolocation error:', err);
         resolve(null);
@@ -43,3 +49,4 @@ export async function requestAndGetCurrentLocation(): Promise<[number, number] |
     );
   });
 }
+

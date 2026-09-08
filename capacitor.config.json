@@ -1,6 +1,6 @@
 {
   "appId": "com.rideon.captain",
-  "appName": "RideOn Captain",
+  "appName": "RIDEON Captain",
   "webDir": "dist_captain",
   "bundledWebRuntime": false,
   "server": {
