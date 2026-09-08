@@ -11,6 +11,7 @@ import ProfileDrawer from '@/components/profile/ProfileDrawer';
 import CustomerBottomNav from '@/components/ui/CustomerBottomNav';
 import CancelRideModal from '@/components/ride/CancelRideModal';
 import { createClient } from '@/lib/supabase/client';
+import { requestAndGetCurrentLocation } from '@/lib/location';
 import { Ride, VehicleType, UserProfile, CaptainProfile } from '@/types/ride';
 import {
   getFareBreakdown,
@@ -257,37 +258,28 @@ export default function CustomerHomePage() {
     initUser();
   }, []);
 
-  // 2. High-Accuracy Geolocation Auto-Detection
-  const detectCurrentLocation = () => {
-    if (typeof window === 'undefined' || !navigator.geolocation) return;
-
+  // 2. High-Accuracy Geolocation Auto-Detection (Capacitor Native APK + Browser)
+  const detectCurrentLocation = async () => {
     setIsDetectingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const coords: [number, number] = [lat, lng];
-        setUserCoords(coords);
-        setPickupCoords(coords);
+    const coords = await requestAndGetCurrentLocation();
+    if (coords) {
+      setUserCoords(coords);
+      setPickupCoords(coords);
 
-        const addr = await reverseGeocode(lat, lng);
-        setPickupAddress(addr);
-        setPickupQuery(addr);
-        setIsDetectingGps(false);
-      },
-      (err) => {
-        console.warn('Geolocation permission denied or unavailable:', err);
-        const defaultCoords: [number, number] = [28.6139, 77.209];
-        setUserCoords(defaultCoords);
-        if (!pickupCoords) {
-          setPickupCoords(defaultCoords);
-          setPickupAddress('1/18, Block A, Shalimar Garden, Sahibabad, Ghaziabad');
-          setPickupQuery('1/18, Block A, Shalimar Garden, Sahibabad, Ghaziabad');
-        }
-        setIsDetectingGps(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      const addr = await reverseGeocode(coords[0], coords[1]);
+      setPickupAddress(addr);
+      setPickupQuery(addr);
+      setIsDetectingGps(false);
+    } else {
+      const defaultCoords: [number, number] = [28.6139, 77.209];
+      setUserCoords(defaultCoords);
+      if (!pickupCoords) {
+        setPickupCoords(defaultCoords);
+        setPickupAddress('Connaught Place, New Delhi');
+        setPickupQuery('Connaught Place, New Delhi');
+      }
+      setIsDetectingGps(false);
+    }
   };
 
   useEffect(() => {
@@ -423,30 +415,54 @@ export default function CustomerHomePage() {
     const fareBreakdown = getFareBreakdown(distanceKm, selectedVehicle);
 
     try {
-      const { data: ride, error } = await supabase
+      const payload: any = {
+        customer_id: user.id,
+        vehicle_type: selectedVehicle,
+        status: 'SEARCHING',
+        pickup_address: pickupAddress,
+        pickup_lat: pickupCoords[0],
+        pickup_lng: pickupCoords[1],
+        destination_address: destinationAddress,
+        destination_lat: destinationCoords[0],
+        destination_lng: destinationCoords[1],
+        distance_km: distanceKm,
+        estimated_fare: fareBreakdown.totalFare,
+        otp: otpCode,
+        drop_otp: dropOtpCode,
+        is_parcel: isParcelOrder,
+      };
+
+      let { data: ride, error } = await supabase
         .from('rides')
-        .insert({
-          customer_id: user.id,
-          vehicle_type: selectedVehicle,
-          status: 'SEARCHING',
-          pickup_address: pickupAddress,
-          pickup_lat: pickupCoords[0],
-          pickup_lng: pickupCoords[1],
-          destination_address: destinationAddress,
-          destination_lat: destinationCoords[0],
-          destination_lng: destinationCoords[1],
-          distance_km: distanceKm,
-          estimated_fare: fareBreakdown.totalFare,
-          otp: otpCode,
-          drop_otp: dropOtpCode,
-          is_parcel: isParcelOrder,
-        })
+        .insert(payload)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Fallback gracefully if database table is missing optional parcel columns
+        if (error.message?.includes('is_parcel') || error.message?.includes('drop_otp') || error.message?.includes('column') || error.message?.includes('schema cache')) {
+          delete payload.is_parcel;
+          delete payload.drop_otp;
+          const retryRes = await supabase
+            .from('rides')
+            .insert(payload)
+            .select()
+            .single();
 
-      setActiveRide(ride as Ride);
+          if (retryRes.error) throw retryRes.error;
+          ride = retryRes.data;
+        } else {
+          throw error;
+        }
+      }
+
+      const activeRideObj: Ride = {
+        ...(ride as Ride),
+        is_parcel: isParcelOrder,
+        drop_otp: dropOtpCode,
+      };
+
+      setActiveRide(activeRideObj);
       setSearchTimeout(45);
     } catch (err: any) {
       alert(err.message || 'Failed to create ride request');

@@ -72,17 +72,29 @@ export default function CaptainProfileDrawer({
       if (pErr) throw pErr;
 
       // 2. Update Captains table
-      const { error: cErr } = await supabase
+      const captPayload: any = {
+        vehicle_type: vehicleType,
+        vehicle_number: vehicleNumber,
+        vehicle_model: vehicleModel,
+        license_number: licenseNumber,
+        accepts_rides: acceptsRides,
+        accepts_parcels: acceptsParcels,
+      };
+
+      let { error: cErr } = await supabase
         .from('captains')
-        .update({
-          vehicle_type: vehicleType,
-          vehicle_number: vehicleNumber,
-          vehicle_model: vehicleModel,
-          license_number: licenseNumber,
-          accepts_rides: acceptsRides,
-          accepts_parcels: acceptsParcels,
-        })
+        .update(captPayload)
         .eq('id', captain.id);
+
+      if (cErr && (cErr.message?.includes('accepts_') || cErr.message?.includes('column'))) {
+        delete captPayload.accepts_rides;
+        delete captPayload.accepts_parcels;
+        const retryRes = await supabase
+          .from('captains')
+          .update(captPayload)
+          .eq('id', captain.id);
+        cErr = retryRes.error;
+      }
 
       if (cErr) throw cErr;
 

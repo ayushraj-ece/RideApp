@@ -9,6 +9,7 @@ import CancelRideModal from '@/components/ride/CancelRideModal';
 import CaptainProfileDrawer from '@/components/profile/CaptainProfileDrawer';
 import CaptainNavigationOverlay from '@/components/navigation/CaptainNavigationOverlay';
 import { createClient } from '@/lib/supabase/client';
+import { requestAndGetCurrentLocation } from '@/lib/location';
 import { Ride, UserProfile, CaptainProfile } from '@/types/ride';
 import { getDirectionsRoute, reverseGeocode } from '@/lib/maps';
 import { getFareBreakdown } from '@/lib/pricing/fareEngine';
@@ -81,39 +82,31 @@ export default function CaptainHomePage() {
   const [isCaptainProfileOpen, setIsCaptainProfileOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // High-Accuracy GPS Auto-Detection & Reverse Geocoding
-  const detectCaptainLocation = () => {
-    if (typeof window === 'undefined' || !navigator.geolocation) return;
-
+  // High-Accuracy GPS Auto-Detection & Reverse Geocoding (Capacitor Native APK + Browser)
+  const detectCaptainLocation = async () => {
     setIsDetectingGps(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const coords: [number, number] = [lat, lng];
-        setGpsCoords(coords);
+    const coords = await requestAndGetCurrentLocation();
+    if (coords) {
+      const [lat, lng] = coords;
+      setGpsCoords(coords);
 
-        const addr = await reverseGeocode(lat, lng);
-        setCaptainAddress(addr);
-        setIsDetectingGps(false);
+      const addr = await reverseGeocode(lat, lng);
+      setCaptainAddress(addr);
+      setIsDetectingGps(false);
 
-        if (captain) {
-          await supabase.rpc('update_captain_location', {
-            p_captain_id: captain.id,
-            p_lat: lat,
-            p_lng: lng,
-          });
-        }
-      },
-      (err) => {
-        console.warn('Captain GPS permission or fetch error:', err);
-        const defaultCoords: [number, number] = [28.6139, 77.209];
-        setGpsCoords((prev) => prev || defaultCoords);
-        setCaptainAddress('Connaught Place, New Delhi');
-        setIsDetectingGps(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      if (captain) {
+        await supabase.rpc('update_captain_location', {
+          p_captain_id: captain.id,
+          p_lat: lat,
+          p_lng: lng,
+        });
+      }
+    } else {
+      const defaultCoords: [number, number] = [28.6139, 77.209];
+      setGpsCoords((prev) => prev || defaultCoords);
+      setCaptainAddress('Connaught Place, New Delhi');
+      setIsDetectingGps(false);
+    }
   };
 
   useEffect(() => {
