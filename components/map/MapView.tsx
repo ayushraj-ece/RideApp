@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MAP_CONFIG } from '@/lib/maps';
 import { VehicleType } from '@/types/ride';
+import { Crosshair, Navigation, Compasses } from 'lucide-react';
 
 interface MapViewProps {
   center?: [number, number];
@@ -13,6 +14,7 @@ interface MapViewProps {
   pickupLocation?: [number, number] | null;
   destinationLocation?: [number, number] | null;
   captainLocation?: [number, number] | null;
+  captainHeading?: number | null;
   captainVehicleType?: VehicleType;
   nearbyCaptains?: Array<{
     id: string;
@@ -25,11 +27,11 @@ interface MapViewProps {
   className?: string;
 }
 
-// Vector SVG Icons for Vehicles (No Emojis!)
+// Professional Vector SVG Icons for Vehicles with Direction Arrow
 const VEHICLE_SVG_ICONS: Record<VehicleType, string> = {
-  BIKE: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h2l3 6.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>`,
-  AUTO: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`,
-  CAB: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M7 11h10"/></svg>`,
+  BIKE: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h2l3 6.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>`,
+  AUTO: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`,
+  CAB: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M7 11h10"/></svg>`,
 };
 
 export default function MapView({
@@ -39,6 +41,7 @@ export default function MapView({
   pickupLocation,
   destinationLocation,
   captainLocation,
+  captainHeading,
   captainVehicleType = 'BIKE',
   nearbyCaptains = [],
   routeCoordinates = [],
@@ -46,7 +49,6 @@ export default function MapView({
   className = 'h-full w-full',
 }: MapViewProps) {
   const onMapClickRef = useRef(onMapClick);
-
   useEffect(() => {
     onMapClickRef.current = onMapClick;
   }, [onMapClick]);
@@ -57,7 +59,56 @@ export default function MapView({
   const polylineBgRef = useRef<L.Polyline | null>(null);
   const polylineFgRef = useRef<L.Polyline | null>(null);
 
-  // Initialize Map
+  // Camera follow & user manual pan tracking state
+  const [isUserPanning, setIsUserPanning] = useState(false);
+  const isUserPanningRef = useRef(false);
+  const isInitialFitDoneRef = useRef(false);
+  const prevRouteKeyRef = useRef<string>('');
+
+  // Animated captain position & heading state
+  const currentCaptainPosRef = useRef<[number, number] | null>(null);
+  const targetCaptainPosRef = useRef<[number, number] | null>(null);
+  const animFrameIdRef = useRef<number | null>(null);
+  const captainHeadingRef = useRef<number>(0);
+
+  // Synchronize state and ref
+  const setPanningState = (panning: boolean) => {
+    isUserPanningRef.current = panning;
+    setIsUserPanning(panning);
+  };
+
+  // Helper to fit map camera onto active markers
+  const fitMapBounds = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      const bounds = L.latLngBounds(routeCoordinates.map((c) => L.latLng(c[0], c[1])));
+      map.fitBounds(bounds, { padding: [70, 70], maxZoom: 16, animate: true });
+    } else if (pickupLocation && destinationLocation) {
+      const bounds = L.latLngBounds([
+        L.latLng(pickupLocation[0], pickupLocation[1]),
+        L.latLng(destinationLocation[0], destinationLocation[1]),
+      ]);
+      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16, animate: true });
+    } else if (pickupLocation) {
+      map.setView(pickupLocation, 15, { animate: true });
+    } else if (captainLocation) {
+      map.setView(captainLocation, 16, { animate: true });
+    } else if (customerLocation) {
+      map.setView(customerLocation, 15, { animate: true });
+    } else if (center) {
+      map.setView(center, zoom, { animate: true });
+    }
+  }, [routeCoordinates, pickupLocation, destinationLocation, captainLocation, customerLocation, center, zoom]);
+
+  // Recenter button click handler
+  const handleRecenterClick = () => {
+    setPanningState(false);
+    fitMapBounds();
+  };
+
+  // Initialize Leaflet Map Instance
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -76,15 +127,31 @@ export default function MapView({
       maxZoom: 19,
     }).addTo(map);
 
+    // Map click handler
     map.on('click', (e: L.LeafletMouseEvent) => {
       if (onMapClickRef.current) {
         onMapClickRef.current(e.latlng.lat, e.latlng.lng);
       }
     });
 
+    // Detect user manual camera interactions (drag, zoom, touch)
+    const onUserInteraction = (e: any) => {
+      // e.originalEvent indicates the event was triggered by user input (mouse/touch/wheel)
+      if (e && e.originalEvent) {
+        setPanningState(true);
+      }
+    };
+
+    map.on('movestart', onUserInteraction);
+    map.on('dragstart', onUserInteraction);
+    map.on('zoomstart', onUserInteraction);
+
     mapRef.current = map;
 
     return () => {
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -92,30 +159,95 @@ export default function MapView({
     };
   }, []);
 
-  // Update Center & Fit Bounds
+  // Update Camera Fit Bounds ONLY when route changes or initial load (DO NOT snap on location update ticks!)
   useEffect(() => {
     if (!mapRef.current) return;
-    const map = mapRef.current;
 
-    if (routeCoordinates && routeCoordinates.length > 0) {
-      const bounds = L.latLngBounds(routeCoordinates.map((c) => L.latLng(c[0], c[1])));
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
-    } else if (pickupLocation && destinationLocation) {
-      const bounds = L.latLngBounds([
-        L.latLng(pickupLocation[0], pickupLocation[1]),
-        L.latLng(destinationLocation[0], destinationLocation[1]),
-      ]);
-      map.fitBounds(bounds, { padding: [70, 70], maxZoom: 16, animate: true });
-    } else if (pickupLocation) {
-      map.setView(pickupLocation, 15, { animate: true });
-    } else if (captainLocation) {
-      map.setView(captainLocation, 16, { animate: true });
-    } else if (center) {
-      map.setView(center, zoom, { animate: true });
+    const currentRouteKey = routeCoordinates && routeCoordinates.length > 0
+      ? `${routeCoordinates[0][0]},${routeCoordinates[0][1]}-${routeCoordinates[routeCoordinates.length - 1][0]},${routeCoordinates[routeCoordinates.length - 1][1]}`
+      : `${pickupLocation?.[0]}-${destinationLocation?.[0]}`;
+
+    const isNewRoute = currentRouteKey !== prevRouteKeyRef.current && currentRouteKey !== 'undefined-undefined';
+
+    // Auto-fit camera ONLY on initial load or major route change when user hasn't manually panned
+    if (!isInitialFitDoneRef.current || (isNewRoute && !isUserPanningRef.current)) {
+      prevRouteKeyRef.current = currentRouteKey;
+      isInitialFitDoneRef.current = true;
+      fitMapBounds();
     }
-  }, [center, zoom, pickupLocation, destinationLocation, captainLocation, routeCoordinates]);
+  }, [routeCoordinates, pickupLocation, destinationLocation, fitMapBounds]);
 
-  // Render Markers & Polylines
+  // Smooth Marker Animation Loop for Captain Vehicle Location & Heading Rotation
+  useEffect(() => {
+    if (!captainLocation) {
+      currentCaptainPosRef.current = null;
+      targetCaptainPosRef.current = null;
+      return;
+    }
+
+    targetCaptainPosRef.current = captainLocation;
+
+    if (!currentCaptainPosRef.current) {
+      currentCaptainPosRef.current = captainLocation;
+    }
+
+    // Determine heading (rotation angle)
+    if (captainHeading !== undefined && captainHeading !== null) {
+      captainHeadingRef.current = captainHeading;
+    } else if (currentCaptainPosRef.current && targetCaptainPosRef.current) {
+      const dLat = targetCaptainPosRef.current[0] - currentCaptainPosRef.current[0];
+      const dLng = targetCaptainPosRef.current[1] - currentCaptainPosRef.current[1];
+      if (Math.abs(dLat) > 0.00001 || Math.abs(dLng) > 0.00001) {
+        const rad = Math.atan2(dLng, dLat);
+        const deg = (rad * (180 / Math.PI) + 360) % 360;
+        captainHeadingRef.current = deg;
+      }
+    }
+
+    // Animate smoothly towards target location over time
+    const startPos = [...currentCaptainPosRef.current] as [number, number];
+    const targetPos = [...targetCaptainPosRef.current] as [number, number];
+    const startTime = performance.now();
+    const duration = 900; // 900ms smooth interpolation duration
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out quadratic easing
+      const easeProgress = progress * (2 - progress);
+
+      const lat = startPos[0] + (targetPos[0] - startPos[0]) * easeProgress;
+      const lng = startPos[1] + (targetPos[1] - startPos[1]) * easeProgress;
+
+      currentCaptainPosRef.current = [lat, lng];
+
+      // Update Leaflet Captain Marker
+      if (mapRef.current && markersRef.current['captain_assigned']) {
+        markersRef.current['captain_assigned'].setLatLng([lat, lng]);
+
+        // Rotate SVG icon element smoothly
+        const el = markersRef.current['captain_assigned'].getElement();
+        if (el) {
+          const rotContainer = el.querySelector('.vehicle-rotation-node') as HTMLElement;
+          if (rotContainer) {
+            rotContainer.style.transform = `rotate(${captainHeadingRef.current}deg)`;
+          }
+        }
+      }
+
+      if (progress < 1) {
+        animFrameIdRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+    }
+    animFrameIdRef.current = requestAnimationFrame(animate);
+
+  }, [captainLocation, captainHeading]);
+
+  // Render Leaflet Markers & Polylines
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
@@ -192,17 +324,17 @@ export default function MapView({
       delete markersRef.current['destination'];
     }
 
-    // 4. Captain Live Location Marker (Pulsing Radar Wave + Gold Badge + "YOU (CAPTAIN)")
+    // 4. Captain Live Location Marker with Smooth Rotation & Direction Indicator
     if (captainLocation) {
       const svgIcon = VEHICLE_SVG_ICONS[captainVehicleType] || VEHICLE_SVG_ICONS['BIKE'];
+      const initialPos = currentCaptainPosRef.current || captainLocation;
+      const initialHeading = captainHeadingRef.current || 0;
+
       const icon = L.divIcon({
         html: `<div class="relative flex items-center justify-center">
             <span class="animate-ping absolute inline-flex h-11 w-11 rounded-full bg-amber-400 opacity-50"></span>
-            <div class="relative flex items-center justify-center bg-slate-950 border-2 border-amber-400 text-amber-400 rounded-full p-2 shadow-2xl">
+            <div class="vehicle-rotation-node transition-transform duration-300 ease-out relative flex items-center justify-center bg-slate-950 border-2 border-amber-400 text-amber-400 rounded-full p-2.5 shadow-2xl" style="transform: rotate(${initialHeading}deg);">
               ${svgIcon}
-            </div>
-            <div class="absolute -bottom-4 bg-amber-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider whitespace-nowrap shadow-md border border-white">
-              YOU (CAPTAIN)
             </div>
           </div>`,
         className: 'custom-map-icon',
@@ -211,17 +343,16 @@ export default function MapView({
       });
 
       if (!markersRef.current['captain_assigned']) {
-        markersRef.current['captain_assigned'] = L.marker(captainLocation, { icon }).addTo(map);
+        markersRef.current['captain_assigned'] = L.marker(initialPos, { icon }).addTo(map);
       } else {
         markersRef.current['captain_assigned'].setIcon(icon);
-        markersRef.current['captain_assigned'].setLatLng(captainLocation);
       }
     } else if (markersRef.current['captain_assigned']) {
       map.removeLayer(markersRef.current['captain_assigned']);
       delete markersRef.current['captain_assigned'];
     }
 
-    // 5. Nearby Available Captains (Vector SVG Vehicles in Dark Badges)
+    // 5. Nearby Available Captains
     Object.keys(markersRef.current).forEach((key) => {
       if (key.startsWith('nearby_') && !nearbyCaptains.some((c) => `nearby_${c.id}` === key)) {
         map.removeLayer(markersRef.current[key]);
@@ -248,7 +379,7 @@ export default function MapView({
       }
     });
 
-    // 6. Polyline Route Drawing (Dual layer path)
+    // 6. Polyline Route Drawing
     if (polylineBgRef.current) {
       map.removeLayer(polylineBgRef.current);
       polylineBgRef.current = null;
@@ -273,7 +404,40 @@ export default function MapView({
         lineCap: 'round',
       }).addTo(map);
     }
-  }, [customerLocation, pickupLocation, destinationLocation, captainLocation, nearbyCaptains, routeCoordinates]);
+  }, [customerLocation, pickupLocation, destinationLocation, captainLocation, nearbyCaptains, routeCoordinates, captainVehicleType]);
 
-  return <div ref={mapContainerRef} className={className} />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapContainerRef} className={className} />
+
+      {/* FLOATING RECENTER / FREE PAN TOGGLE BUTTON (TOP-RIGHT / BOTTOM-RIGHT OF MAP) */}
+      <div className="absolute top-20 right-4 z-20 pointer-events-auto flex flex-col gap-2">
+        <button
+          onClick={handleRecenterClick}
+          className={`flex items-center justify-center h-11 w-11 rounded-2xl shadow-xl border backdrop-blur-md transition-all duration-200 active:scale-95 ${
+            isUserPanning
+              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/20'
+              : 'bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:text-amber-500'
+          }`}
+          title={isUserPanning ? 'Free Panning Active - Tap to Recenter Camera' : 'Recenter & Follow Live Location'}
+        >
+          <Crosshair className={`h-5 w-5 ${isUserPanning ? 'animate-pulse' : ''}`} />
+        </button>
+      </div>
+
+      {/* USER PANNING NOTIFICATION BADGE */}
+      {isUserPanning && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+          <button
+            onClick={handleRecenterClick}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/80 text-amber-400 border border-amber-400/40 shadow-xl backdrop-blur-md text-[11px] font-bold hover:bg-slate-900 transition-all active:scale-95"
+          >
+            <Crosshair className="h-3.5 w-3.5 animate-spin text-amber-400" />
+            <span>Map Free Panned • Tap to Recenter</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
+

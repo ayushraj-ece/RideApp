@@ -192,9 +192,24 @@ export default function CaptainHomePage() {
   useEffect(() => {
     if ((!isOnline && !activeRide) || !captain || typeof window === 'undefined' || !navigator.geolocation) return;
 
-    const syncLocation = (lat: number, lng: number) => {
+    const syncLocation = (lat: number, lng: number, heading?: number | null) => {
       const coords: [number, number] = [lat, lng];
       setGpsCoords(coords);
+
+      if (captain?.id) {
+        const channel = supabase.channel(`captain_loc_${captain.id}`);
+        channel.send({
+          type: 'broadcast',
+          event: 'location_update',
+          payload: {
+            captain_id: captain.id,
+            latitude: lat,
+            longitude: lng,
+            heading: heading || null,
+            timestamp: Date.now(),
+          },
+        });
+      }
 
       supabase.rpc('update_captain_location', {
         p_captain_id: captain.id,
@@ -208,7 +223,7 @@ export default function CaptainHomePage() {
     };
 
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude),
+      (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading),
       (err) => console.warn('GPS watch error:', err),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
@@ -216,7 +231,7 @@ export default function CaptainHomePage() {
     // 3-Second High-Frequency Interval Fallback for Continuous Realtime Broadcasting
     const syncInterval = setInterval(() => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude),
+        (pos) => syncLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.heading),
         null,
         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );

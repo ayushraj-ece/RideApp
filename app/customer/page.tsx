@@ -153,6 +153,7 @@ export default function CustomerHomePage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isParcelModalOpen, setIsParcelModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'RIDE' | 'PARCEL' | 'PROFILE'>('RIDE');
 
   // 1. Authenticate user & check active ride
@@ -1475,6 +1476,97 @@ export default function CustomerHomePage() {
           onSubmit={handleRatingSubmit}
           onClose={() => setShowRatingModal(false)}
         />
+      )}
+
+      {/* EXPANDABLE TRIP DETAILS MODAL SHEET (MATCHING SCREENSHOT 4 RAPIDO) */}
+      {isTripDetailsOpen && activeRide && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-t-[32px] sm:rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
+            {/* TOP HEADER */}
+            <div className="relative flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md">
+                  {activeRide.vehicle_type === 'BIKE' ? <Bike className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    {activeRide.is_parcel ? 'Parcel Delivery' : `${activeRide.vehicle_type} Ride`}
+                  </h3>
+                  <span className="text-[11px] text-slate-500 font-medium">Trip ID: #{activeRide.id.slice(0, 8)}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsTripDetailsOpen(false)}
+                className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* LOCATION DETAILS SECTION */}
+            <div className="space-y-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-extrabold text-slate-900 dark:text-slate-100">Location Details</h4>
+
+              <div className="space-y-3 relative pl-1">
+                {/* PICKUP */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="h-3.5 w-3.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-slate-400 block">Pickup</span>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate leading-snug">
+                        {activeRide.pickup_address}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="ml-1.5 border-l-2 border-dashed border-slate-300 dark:border-slate-700 h-4"></div>
+
+                {/* DROP */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="h-3.5 w-3.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-slate-400 block">Drop Location</span>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate leading-snug">
+                        {activeRide.destination_address}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TOTAL FARE & PAYMENT METHOD */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">Total Fare</span>
+                <span className="font-black text-lg text-slate-900 dark:text-slate-100">₹{activeRide.estimated_fare}</span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 dark:border-slate-800 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-semibold">
+                  <DollarSign className="h-4 w-4 text-emerald-500" />
+                  <span>Paying via cash</span>
+                </div>
+                <span className="text-amber-500 font-extrabold text-xs">Cash</span>
+              </div>
+            </div>
+
+            {/* CANCEL RIDE CTA BUTTON */}
+            <button
+              onClick={() => {
+                setIsTripDetailsOpen(false);
+                setIsCancelModalOpen(true);
+              }}
+              className="w-full rounded-2xl border-2 border-rose-600 text-rose-600 hover:bg-rose-600 hover:text-white font-extrabold py-3.5 text-xs transition-colors shadow-sm"
+            >
+              Cancel Ride
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Cancel Ride Modal with Reasons & Green/Red Confirmation */}
