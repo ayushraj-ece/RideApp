@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MAP_CONFIG } from '@/lib/maps';
 import { VehicleType } from '@/types/ride';
-import { Crosshair, Navigation, Compasses } from 'lucide-react';
+import { Crosshair, Navigation, Compass } from 'lucide-react';
 
 interface MapViewProps {
   center?: [number, number];
