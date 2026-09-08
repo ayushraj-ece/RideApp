@@ -605,6 +605,7 @@ export default function CustomerHomePage() {
   const handleRatingSubmit = async (rating: number, feedback: string) => {
     if (!activeRide || !user || !assignedCaptain) return;
 
+    // 1. Record rating entry
     await supabase.from('ratings').insert({
       ride_id: activeRide.id,
       customer_id: user.id,
@@ -612,6 +613,20 @@ export default function CustomerHomePage() {
       rating,
       feedback,
     });
+
+    // 2. Dynamic rating calculation: recalculate sum and count for captain
+    const currentSum = Number(assignedCaptain.rating_sum) || 0;
+    const currentCount = Number(assignedCaptain.rating_count) || 0;
+    const newSum = currentSum + rating;
+    const newCount = currentCount + 1;
+
+    await supabase
+      .from('captains')
+      .update({
+        rating_sum: newSum,
+        rating_count: newCount,
+      })
+      .eq('id', assignedCaptain.id);
 
     setShowRatingModal(false);
     setActiveRide(null);
@@ -1470,8 +1485,11 @@ export default function CustomerHomePage() {
         <RatingModal
           isOpen={showRatingModal}
           rideId={activeRide.id}
+          isParcel={activeRide.is_parcel}
           captainName={assignedCaptain?.profile?.name}
           vehicleNumber={assignedCaptain?.vehicle_number}
+          vehicleModel={assignedCaptain?.vehicle_model}
+          captainRating={assignedCaptain?.rating_count ? (assignedCaptain.rating_sum / assignedCaptain.rating_count) : 5.0}
           finalFare={activeRide.estimated_fare}
           onSubmit={handleRatingSubmit}
           onClose={() => setShowRatingModal(false)}
