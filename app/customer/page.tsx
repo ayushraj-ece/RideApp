@@ -155,6 +155,8 @@ export default function CustomerHomePage() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'RIDE' | 'PARCEL' | 'PROFILE'>('RIDE');
+  const [isCustomerSheetCollapsed, setIsCustomerSheetCollapsed] = useState(false);
+
 
   // 1. Authenticate user & check active ride
   useEffect(() => {
@@ -1147,26 +1149,60 @@ export default function CustomerHomePage() {
 
             {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
             {activeRide && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[82vh] overflow-y-auto overscroll-contain">
-                {/* SIMPLE STATUS & OTP HEADER (PARCEL vs RIDE DISTINCTION) */}
-                <div className="space-y-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {activeRide.is_parcel ? (
-                        <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1">
-                          <Package className="h-3 w-3" />
-                          PARCEL DELIVERY
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          {activeRide.status.replace('_', ' ')}
-                        </span>
-                      )}
+              <div className={`rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+                isCustomerSheetCollapsed ? 'max-h-[85px] overflow-hidden' : 'max-h-[50vh] overflow-y-auto overscroll-contain space-y-3.5'
+              }`}>
+                {/* TOP COLLAPSE / EXPAND HANDLE */}
+                <button
+                  onClick={() => setIsCustomerSheetCollapsed(!isCustomerSheetCollapsed)}
+                  className="w-full flex items-center justify-center gap-1.5 pb-2 -mt-1 text-slate-400 hover:text-amber-500 transition-colors"
+                  title={isCustomerSheetCollapsed ? "Expand ride details" : "Minimize panel for full map view"}
+                >
+                  <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                  {isCustomerSheetCollapsed ? <ChevronUp className="h-4 w-4 text-amber-500 animate-bounce" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+
+                {/* COLLAPSED MINI BAR MODE */}
+                {isCustomerSheetCollapsed ? (
+                  <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setIsCustomerSheetCollapsed(false)}>
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        {activeRide.status.replace('_', ' ')}
+                      </span>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {assignedCaptain?.profile?.name || 'Captain Assigned'}
+                      </span>
                     </div>
-                    <span className="text-sm font-black text-slate-900 dark:text-slate-100">
-                      ₹{activeRide.estimated_fare}
-                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-black text-slate-900 dark:text-slate-100">₹{activeRide.estimated_fare}</span>
+                      <span className="p-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold px-2.5 py-0.5">
+                        EXPAND MAP DETAILS
+                      </span>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    {/* SIMPLE STATUS & OTP HEADER (PARCEL vs RIDE DISTINCTION) */}
+                    <div className="space-y-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {activeRide.is_parcel ? (
+                            <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1">
+                              <Package className="h-3 w-3" />
+                              PARCEL DELIVERY
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              {activeRide.status.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm font-black text-slate-900 dark:text-slate-100">
+                          ₹{activeRide.estimated_fare}
+                        </span>
+                      </div>
+
 
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
@@ -1392,8 +1428,11 @@ export default function CustomerHomePage() {
                     Cancel Ride
                   </button>
                 </div>
-              </div>
+              </>
             )}
+          </div>
+        )}
+
 
             {/* CASE C: RAPIDO SCREENSHOT 2 (HOME) & SCREENSHOT 4 (BOOKING) */}
             {!activeRide && (

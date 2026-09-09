@@ -81,6 +81,7 @@ export default function CaptainHomePage() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCaptainProfileOpen, setIsCaptainProfileOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isCardCollapsed, setIsCardCollapsed] = useState(false);
 
   // High-Accuracy GPS Auto-Detection & Reverse Geocoding (Capacitor Native APK + Browser)
   const detectCaptainLocation = async () => {
@@ -748,31 +749,65 @@ export default function CaptainHomePage() {
 
           {/* CASE D: ACTIVE RIDE NAVIGATION DASHBOARD SHEET */}
           {activeRide && (
-            <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-6 shadow-2xl backdrop-blur-2xl space-y-3.5 max-h-[82vh] overflow-y-auto overscroll-contain">
-              {/* HEADER STATUS BADGE & TITLE */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    {activeRide.is_parcel && (
-                      <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
-                        <Package className="h-3 w-3" /> PARCEL
-                      </span>
-                    )}
-                    <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <div className={`rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 pb-6 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
+              isCardCollapsed ? 'max-h-[85px] overflow-hidden' : 'max-h-[55vh] overflow-y-auto overscroll-contain space-y-3.5'
+            }`}>
+              {/* TOP COLLAPSE / EXPAND HANDLE */}
+              <button
+                onClick={() => setIsCardCollapsed(!isCardCollapsed)}
+                className="w-full flex items-center justify-center gap-1.5 pb-2 -mt-1 text-slate-400 hover:text-amber-500 transition-colors"
+                title={isCardCollapsed ? "Expand trip info panel" : "Minimize panel for full screen map view"}
+              >
+                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                {isCardCollapsed ? <ChevronUp className="h-4 w-4 text-amber-500 animate-bounce" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+
+              {/* COLLAPSED MINI BAR MODE */}
+              {isCardCollapsed ? (
+                <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setIsCardCollapsed(false)}>
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       {activeRide.status.replace('_', ' ')}
                     </span>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                      {activeRide.customer?.name || 'Customer'}
+                    </span>
                   </div>
-                  <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm mt-1.5">
-                    {activeRide.status === 'ACCEPTED' && (activeRide.is_parcel ? 'Navigate to Parcel Pickup (Max 20kg)' : 'Navigate to Pickup Location')}
-                    {activeRide.status === 'CAPTAIN_ARRIVED' && (activeRide.is_parcel ? 'Enter Sender 4-Digit Pickup OTP' : 'Verify 4-Digit OTP from Customer')}
-                    {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (activeRide.is_parcel ? 'Transporting Parcel to Recipient' : 'Driving to Destination')}
-                  </h3>
-                </div>
 
-                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-2xl">
-                  ₹{activeRide.estimated_fare}
-                </span>
-              </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">₹{activeRide.estimated_fare}</span>
+                    <span className="p-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold px-2.5 py-0.5">
+                      EXPAND MAP DETAILS
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* HEADER STATUS BADGE & TITLE */}
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        {activeRide.is_parcel && (
+                          <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                            <Package className="h-3 w-3" /> PARCEL
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {activeRide.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm mt-1.5">
+                        {activeRide.status === 'ACCEPTED' && (activeRide.is_parcel ? 'Navigate to Parcel Pickup (Max 20kg)' : 'Navigate to Pickup Location')}
+                        {activeRide.status === 'CAPTAIN_ARRIVED' && (activeRide.is_parcel ? 'Enter Sender 4-Digit Pickup OTP' : 'Verify 4-Digit OTP from Customer')}
+                        {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (activeRide.is_parcel ? 'Transporting Parcel to Recipient' : 'Driving to Destination')}
+                      </h3>
+                    </div>
+
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-2xl">
+                      ₹{activeRide.estimated_fare}
+                    </span>
+                  </div>
+
 
               {/* CUSTOMER PROFILE & DIRECT COMMUNICATION CARD */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 space-y-3">
@@ -969,8 +1004,11 @@ export default function CaptainHomePage() {
               >
                 Cancel Ride
               </button>
-            </div>
+            </>
           )}
+        </div>
+      )}
+
         </div>
       </div>
 

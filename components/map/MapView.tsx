@@ -134,21 +134,39 @@ export default function MapView({
       }
     });
 
-    // Detect user manual camera interactions (drag, zoom, touch)
-    const onUserInteraction = (e: any) => {
-      // e.originalEvent indicates the event was triggered by user input (mouse/touch/wheel)
+    // Detect user manual camera interactions (drag, zoom, touch, scroll)
+    const onUserInteraction = () => {
+      setPanningState(true);
+    };
+
+    map.on('movestart', (e: any) => {
       if (e && e.originalEvent) {
         setPanningState(true);
       }
-    };
-
-    map.on('movestart', onUserInteraction);
+    });
     map.on('dragstart', onUserInteraction);
     map.on('zoomstart', onUserInteraction);
+
+    // Attach direct DOM listeners on map container to catch all touch/pointer gestures
+    const container = mapContainerRef.current;
+    const handlePointerDown = () => {
+      setPanningState(true);
+    };
+
+    if (container) {
+      container.addEventListener('pointerdown', handlePointerDown, { passive: true });
+      container.addEventListener('touchstart', handlePointerDown, { passive: true });
+      container.addEventListener('wheel', handlePointerDown, { passive: true });
+    }
 
     mapRef.current = map;
 
     return () => {
+      if (container) {
+        container.removeEventListener('pointerdown', handlePointerDown);
+        container.removeEventListener('touchstart', handlePointerDown);
+        container.removeEventListener('wheel', handlePointerDown);
+      }
       if (animFrameIdRef.current) {
         cancelAnimationFrame(animFrameIdRef.current);
       }
@@ -159,23 +177,16 @@ export default function MapView({
     };
   }, []);
 
-  // Update Camera Fit Bounds ONLY when route changes or initial load (DO NOT snap on location update ticks!)
+  // Auto-fit camera ONLY ONCE on initial mount (NEVER auto-snap back when user has panned)
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const currentRouteKey = routeCoordinates && routeCoordinates.length > 0
-      ? `${routeCoordinates[0][0]},${routeCoordinates[0][1]}-${routeCoordinates[routeCoordinates.length - 1][0]},${routeCoordinates[routeCoordinates.length - 1][1]}`
-      : `${pickupLocation?.[0]}-${destinationLocation?.[0]}`;
-
-    const isNewRoute = currentRouteKey !== prevRouteKeyRef.current && currentRouteKey !== 'undefined-undefined';
-
-    // Auto-fit camera ONLY on initial load or major route change when user hasn't manually panned
-    if (!isInitialFitDoneRef.current || (isNewRoute && !isUserPanningRef.current)) {
-      prevRouteKeyRef.current = currentRouteKey;
+    if (!isInitialFitDoneRef.current && !isUserPanningRef.current) {
       isInitialFitDoneRef.current = true;
       fitMapBounds();
     }
-  }, [routeCoordinates, pickupLocation, destinationLocation, fitMapBounds]);
+  }, [fitMapBounds]);
+
 
   // Smooth Marker Animation Loop for Captain Vehicle Location & Heading Rotation
   useEffect(() => {
