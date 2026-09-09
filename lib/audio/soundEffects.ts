@@ -114,6 +114,23 @@ class SoundEffectsService {
       console.warn('Audio play failed:', e);
     }
   }
+
+  // Aliases for compatibility across components
+  playRideRequestSound() {
+    this.playRideRequestChime();
+  }
+
+  playSuccessSound() {
+    this.playAcceptedChime();
+  }
+
+  playStatusChangeSound() {
+    this.playAcceptedChime();
+  }
+
+  playErrorBeep() {
+    this.playMessageChime();
+  }
 }
 
 export const soundEffects = new SoundEffectsService();

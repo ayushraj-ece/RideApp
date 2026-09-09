@@ -951,8 +951,10 @@ export default function CaptainHomePage() {
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             rideId={activeRide.id}
-            userRole="CAPTAIN"
-            peerName={activeRide.customer?.name || 'Customer'}
+            currentUserId={profile?.id || ''}
+            currentUserRole="CAPTAIN"
+            recipientName={activeRide.customer?.name || 'Customer'}
+            recipientPhone={activeRide.customer?.phone}
           />
           <CaptainNavigationOverlay
             isOpen={isNavigating}
@@ -966,9 +968,9 @@ export default function CaptainHomePage() {
         <CaptainProfileDrawer
           isOpen={isCaptainProfileOpen}
           onClose={() => setIsCaptainProfileOpen(false)}
-          captainProfile={captain}
-          userProfile={profile}
-          onProfileUpdate={(updatedProf, updatedCapt) => {
+          profile={profile}
+          captain={captain}
+          onUpdate={(updatedProf: UserProfile, updatedCapt: CaptainProfile) => {
             setProfile(updatedProf);
             setCaptain(updatedCapt);
           }}
