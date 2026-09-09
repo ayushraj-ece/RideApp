@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 180" width="120" height="180">
+  <defs>
+    <filter id="shadowAuto" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <linearGradient id="autoYellow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="50%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="autoGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#15803d"/>
+      <stop offset="50%" stop-color="#166534"/>
+      <stop offset="100%" stop-color="#14532d"/>
+    </linearGradient>
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#shadowAuto)">
+    <!-- Rear Wheels -->
+    <rect x="14" y="125" width="14" height="28" rx="4" fill="#0f172a"/>
+    <rect x="92" y="125" width="14" height="28" rx="4" fill="#0f172a"/>
+
+    <!-- Front Wheel -->
+    <rect x="53" y="8" width="14" height="24" rx="4" fill="#0f172a"/>
+
+    <!-- Auto Rickshaw Main Body Outline (Tapered Top-Down View) -->
+    <!-- Green Lower Body / Mudguards -->
+    <path d="M 50,22 L 70,22 C 84,35 102,65 102,120 L 102,152 C 102,158 96,164 88,164 L 32,164 C 24,164 18,158 18,152 L 18,120 C 18,65 36,35 50,22 Z" fill="url(#autoGreen)"/>
+
+    <!-- Yellow Top Hood Canvas -->
+    <path d="M 46,30 Q 60,20 74,30 L 94,75 Q 96,130 92,156 L 28,156 Q 24,130 26,75 Z" fill="url(#autoYellow)"/>
+
+    <!-- Front Windshield -->
+    <path d="M 42,40 Q 60,32 78,40 L 82,58 Q 60,54 38,58 Z" fill="url(#glassGradient)" stroke="#0f172a" stroke-width="1.5"/>
+    <path d="M 44,42 Q 60,35 76,42" stroke="#ffffff" stroke-width="1.5" fill="none" opacity="0.7"/>
+
+    <!-- Driver Canopy & Handlebar (Top View) -->
+    <rect x="22" y="44" width="6" height="12" rx="2" fill="#334155"/>
+    <rect x="92" y="44" width="6" height="12" rx="2" fill="#334155"/>
+
+    <!-- Driver Seat & Driver -->
+    <ellipse cx="60" cy="74" r="14" fill="#0f172a"/>
+    <circle cx="60" cy="72" r="10" fill="#facc15"/>
+
+    <!-- Passenger Rear Seat -->
+    <rect x="30" y="124" width="60" height="24" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+
+    <!-- Headlight Front Lamp -->
+    <ellipse cx="60" cy="18" rx="8" ry="5" fill="#fef08a" stroke="#eab308" stroke-width="1"/>
+
+    <!-- Rear Bumper & Lights -->
+    <rect x="24" y="160" width="72" height="6" rx="2" fill="#0f172a"/>
+    <rect x="26" y="161" width="12" height="4" rx="1" fill="#ef4444"/>
+    <rect x="82" y="161" width="12" height="4" rx="1" fill="#ef4444"/>
+    <rect x="50" y="161" width="20" height="4" rx="1" fill="#f8fafc"/>
+  </g>
+</svg>

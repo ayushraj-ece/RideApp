@@ -34,8 +34,9 @@
 
 /* Custom Leaflet Map Icon Styling */
 .custom-map-icon {
-  background: transparent;
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  overflow: visible !important;
 }
 
 .leaflet-container {

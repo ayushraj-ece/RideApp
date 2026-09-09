@@ -695,10 +695,32 @@ export default function CustomerHomePage() {
       )
       .subscribe();
 
+    const pollInterval = setInterval(async () => {
+      const { data: updatedRide } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('id', activeRide.id)
+        .single();
+
+      if (updatedRide && (updatedRide.status !== activeRide.status || updatedRide.captain_id !== activeRide.captain_id)) {
+        setActiveRide(updatedRide as Ride);
+
+        if (updatedRide.captain_id && (!assignedCaptain || assignedCaptain.id !== updatedRide.captain_id)) {
+          fetchCaptainDetails(updatedRide.captain_id);
+          soundEffects.playAcceptedChime();
+        }
+
+        if (updatedRide.status === 'COMPLETED') {
+          setShowRatingModal(true);
+        }
+      }
+    }, 2000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
-  }, [activeRide?.id, assignedCaptain?.id]);
+  }, [activeRide?.id]);
 
   useEffect(() => {
     if (!activeRide?.captain_id || !['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'IN_PROGRESS'].includes(activeRide.status)) {
@@ -866,6 +888,7 @@ export default function CustomerHomePage() {
             pickupLocation={pickupCoords}
             destinationLocation={destinationCoords}
             captainLocation={captainLiveLocation}
+            captainVehicleType={assignedCaptain?.vehicle_type || activeRide?.vehicle_type || selectedVehicle}
             nearbyCaptains={nearbyCaptains}
             routeCoordinates={routeCoords}
             onMapClick={handleMapClick}

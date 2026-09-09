@@ -27,11 +27,11 @@ interface MapViewProps {
   className?: string;
 }
 
-// Professional Vector SVG Icons for Vehicles with Direction Arrow
-const VEHICLE_SVG_ICONS: Record<VehicleType, string> = {
-  BIKE: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6h2l3 6.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>`,
-  AUTO: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`,
-  CAB: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-amber-400"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v7c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M7 11h10"/></svg>`,
+// Top-Down Vehicle Asset Paths (2:3 aspect ratio, facing top/movement direction)
+const VEHICLE_IMAGE_PATHS: Record<VehicleType, string> = {
+  BIKE: '/vehicles/bike.svg',
+  AUTO: '/vehicles/auto.svg',
+  CAB: '/vehicles/cab.svg',
 };
 
 export default function MapView({
@@ -81,22 +81,21 @@ export default function MapView({
   const fitMapBounds = useCallback(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
+    const points: L.LatLng[] = [];
 
     if (routeCoordinates && routeCoordinates.length > 0) {
-      const bounds = L.latLngBounds(routeCoordinates.map((c) => L.latLng(c[0], c[1])));
-      map.fitBounds(bounds, { padding: [70, 70], maxZoom: 16, animate: true });
-    } else if (pickupLocation && destinationLocation) {
-      const bounds = L.latLngBounds([
-        L.latLng(pickupLocation[0], pickupLocation[1]),
-        L.latLng(destinationLocation[0], destinationLocation[1]),
-      ]);
-      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16, animate: true });
-    } else if (pickupLocation) {
-      map.setView(pickupLocation, 15, { animate: true });
-    } else if (captainLocation) {
-      map.setView(captainLocation, 16, { animate: true });
-    } else if (customerLocation) {
-      map.setView(customerLocation, 15, { animate: true });
+      routeCoordinates.forEach((c) => points.push(L.latLng(c[0], c[1])));
+    }
+    if (pickupLocation) points.push(L.latLng(pickupLocation[0], pickupLocation[1]));
+    if (destinationLocation) points.push(L.latLng(destinationLocation[0], destinationLocation[1]));
+    if (captainLocation) points.push(L.latLng(captainLocation[0], captainLocation[1]));
+    if (customerLocation) points.push(L.latLng(customerLocation[0], customerLocation[1]));
+
+    if (points.length > 1) {
+      const bounds = L.latLngBounds(points);
+      map.fitBounds(bounds, { padding: [65, 65], maxZoom: 16, animate: true });
+    } else if (points.length === 1) {
+      map.setView(points[0], 16, { animate: true });
     } else if (center) {
       map.setView(center, zoom, { animate: true });
     }
@@ -177,16 +176,30 @@ export default function MapView({
     };
   }, []);
 
-  // Auto-fit camera ONLY ONCE on initial mount (NEVER auto-snap back when user has panned)
+  // Update map center when center prop changes
+  const prevCenterRef = useRef<[number, number] | null>(null);
+  useEffect(() => {
+    if (!mapRef.current || !center) return;
+    const [lat, lng] = center;
+    if (
+      !prevCenterRef.current ||
+      prevCenterRef.current[0] !== lat ||
+      prevCenterRef.current[1] !== lng
+    ) {
+      prevCenterRef.current = [lat, lng];
+      setPanningState(false);
+      mapRef.current.setView([lat, lng], mapRef.current.getZoom() || zoom, { animate: true });
+    }
+  }, [center, zoom]);
+
+  // Auto-fit camera whenever key locations (pickup, drop, route) change, unless user is manually panning
   useEffect(() => {
     if (!mapRef.current) return;
 
-    if (!isInitialFitDoneRef.current && !isUserPanningRef.current) {
-      isInitialFitDoneRef.current = true;
+    if (!isUserPanningRef.current) {
       fitMapBounds();
     }
-  }, [fitMapBounds]);
-
+  }, [pickupLocation, destinationLocation, routeCoordinates, fitMapBounds]);
 
   // Smooth Marker Animation Loop for Captain Vehicle Location & Heading Rotation
   useEffect(() => {
@@ -263,12 +276,12 @@ export default function MapView({
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    // 1. Customer Location Marker (Pulsing Dot)
-    if (customerLocation) {
+    // 1. Customer Location Marker (Pulsing Sky Blue Dot)
+    if (customerLocation && typeof customerLocation[0] === 'number' && typeof customerLocation[1] === 'number' && !isNaN(customerLocation[0]) && !isNaN(customerLocation[1])) {
       const icon = L.divIcon({
-        html: `<div class="relative flex items-center justify-center w-7 h-7">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60"></span>
-            <span class="relative inline-flex rounded-full h-4 w-4 bg-sky-500 border-2 border-white shadow-md"></span>
+        html: `<div style="position:relative; display:flex; items-center; justify-content:center; width:28px; height:28px;">
+            <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#38bdf8; opacity:0.6; animation:ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+            <span style="position:relative; width:16px; height:16px; border-radius:50%; background-color:#0284c7; border:2px solid #ffffff; box-shadow:0 4px 10px rgba(0,0,0,0.3);"></span>
           </div>`,
         className: 'custom-map-icon',
         iconSize: [28, 28],
@@ -276,7 +289,7 @@ export default function MapView({
       });
 
       if (!markersRef.current['customer']) {
-        markersRef.current['customer'] = L.marker(customerLocation, { icon }).addTo(map);
+        markersRef.current['customer'] = L.marker(customerLocation, { icon, zIndexOffset: 1500 }).addTo(map);
       } else {
         markersRef.current['customer'].setLatLng(customerLocation);
       }
@@ -286,13 +299,13 @@ export default function MapView({
     }
 
     // 2. Pickup Location Marker (Sleek Emerald Teardrop)
-    if (pickupLocation) {
+    if (pickupLocation && typeof pickupLocation[0] === 'number' && typeof pickupLocation[1] === 'number' && !isNaN(pickupLocation[0]) && !isNaN(pickupLocation[1])) {
       const icon = L.divIcon({
-        html: `<div class="flex flex-col items-center">
-            <div class="bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-[10px] tracking-wider uppercase px-2.5 py-0.5 rounded-full shadow-xl border border-white flex items-center gap-1">
+        html: `<div style="display:flex; flex-direction:column; align-items:center; width:70px; height:36px; pointer-events:none;">
+            <div style="background:linear-gradient(135deg, #059669, #10b981); color:#ffffff; font-weight:900; font-size:10px; padding:3px 9px; border-radius:12px; border:1.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.35); text-transform:uppercase; letter-spacing:0.8px;">
               <span>PICKUP</span>
             </div>
-            <div class="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-emerald-600 shadow-sm"></div>
+            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #059669; margin-top:-1px;"></div>
           </div>`,
         className: 'custom-map-icon',
         iconSize: [70, 36],
@@ -300,9 +313,8 @@ export default function MapView({
       });
 
       if (!markersRef.current['pickup']) {
-        markersRef.current['pickup'] = L.marker(pickupLocation, { icon }).addTo(map);
+        markersRef.current['pickup'] = L.marker(pickupLocation, { icon, zIndexOffset: 2500 }).addTo(map);
       } else {
-        markersRef.current['pickup'].setIcon(icon);
         markersRef.current['pickup'].setLatLng(pickupLocation);
       }
     } else if (markersRef.current['pickup']) {
@@ -311,13 +323,13 @@ export default function MapView({
     }
 
     // 3. Destination Location Marker (Sleek Rose Teardrop)
-    if (destinationLocation) {
+    if (destinationLocation && typeof destinationLocation[0] === 'number' && typeof destinationLocation[1] === 'number' && !isNaN(destinationLocation[0]) && !isNaN(destinationLocation[1])) {
       const icon = L.divIcon({
-        html: `<div class="flex flex-col items-center">
-            <div class="bg-gradient-to-tr from-rose-600 to-pink-500 text-white font-extrabold text-[10px] tracking-wider uppercase px-2.5 py-0.5 rounded-full shadow-xl border border-white flex items-center gap-1">
+        html: `<div style="display:flex; flex-direction:column; align-items:center; width:70px; height:36px; pointer-events:none;">
+            <div style="background:linear-gradient(135deg, #e11d48, #f43f5e); color:#ffffff; font-weight:900; font-size:10px; padding:3px 9px; border-radius:12px; border:1.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.35); text-transform:uppercase; letter-spacing:0.8px;">
               <span>DROP</span>
             </div>
-            <div class="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[7px] border-t-rose-600 shadow-sm"></div>
+            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #e11d48; margin-top:-1px;"></div>
           </div>`,
         className: 'custom-map-icon',
         iconSize: [70, 36],
@@ -325,9 +337,8 @@ export default function MapView({
       });
 
       if (!markersRef.current['destination']) {
-        markersRef.current['destination'] = L.marker(destinationLocation, { icon }).addTo(map);
+        markersRef.current['destination'] = L.marker(destinationLocation, { icon, zIndexOffset: 2500 }).addTo(map);
       } else {
-        markersRef.current['destination'].setIcon(icon);
         markersRef.current['destination'].setLatLng(destinationLocation);
       }
     } else if (markersRef.current['destination']) {
@@ -335,28 +346,37 @@ export default function MapView({
       delete markersRef.current['destination'];
     }
 
-    // 4. Captain Live Location Marker with Smooth Rotation & Direction Indicator
-    if (captainLocation) {
-      const svgIcon = VEHICLE_SVG_ICONS[captainVehicleType] || VEHICLE_SVG_ICONS['BIKE'];
-      const initialPos = currentCaptainPosRef.current || captainLocation;
+    // 4. Captain Live Location Marker with Smooth Rotation & Explicit High Visibility
+    const activeCaptainPos = captainLocation || currentCaptainPosRef.current;
+    if (activeCaptainPos && typeof activeCaptainPos[0] === 'number' && typeof activeCaptainPos[1] === 'number' && !isNaN(activeCaptainPos[0]) && !isNaN(activeCaptainPos[1])) {
+      const vehicleSrc = VEHICLE_IMAGE_PATHS[captainVehicleType] || VEHICLE_IMAGE_PATHS['BIKE'];
       const initialHeading = captainHeadingRef.current || 0;
 
-      const icon = L.divIcon({
-        html: `<div class="relative flex items-center justify-center">
-            <span class="animate-ping absolute inline-flex h-11 w-11 rounded-full bg-amber-400 opacity-50"></span>
-            <div class="vehicle-rotation-node transition-transform duration-300 ease-out relative flex items-center justify-center bg-slate-950 border-2 border-amber-400 text-amber-400 rounded-full p-2.5 shadow-2xl" style="transform: rotate(${initialHeading}deg);">
-              ${svgIcon}
-            </div>
-          </div>`,
-        className: 'custom-map-icon',
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
-      });
-
       if (!markersRef.current['captain_assigned']) {
-        markersRef.current['captain_assigned'] = L.marker(initialPos, { icon }).addTo(map);
+        const icon = L.divIcon({
+          html: `<div style="position:relative; width:44px; height:66px; display:flex; align-items:center; justify-content:center; pointer-events:none; overflow:visible;">
+              <div class="vehicle-rotation-node" style="transform: rotate(${initialHeading}deg); width:44px; height:66px; transition: transform 0.3s ease-out; overflow:visible;">
+                <img src="${vehicleSrc}" alt="${captainVehicleType}" style="width:44px; height:66px; object-fit:contain; display:block; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.4));" />
+              </div>
+            </div>`,
+          className: 'custom-map-icon',
+          iconSize: [44, 66],
+          iconAnchor: [22, 33],
+        });
+        markersRef.current['captain_assigned'] = L.marker(activeCaptainPos, { icon, zIndexOffset: 3000 }).addTo(map);
       } else {
-        markersRef.current['captain_assigned'].setIcon(icon);
+        markersRef.current['captain_assigned'].setLatLng(activeCaptainPos);
+        const el = markersRef.current['captain_assigned'].getElement();
+        if (el) {
+          const img = el.querySelector('img');
+          if (img && img.getAttribute('src') !== vehicleSrc) {
+            img.setAttribute('src', vehicleSrc);
+          }
+          const rotContainer = el.querySelector('.vehicle-rotation-node') as HTMLElement;
+          if (rotContainer) {
+            rotContainer.style.transform = `rotate(${initialHeading}deg)`;
+          }
+        }
       }
     } else if (markersRef.current['captain_assigned']) {
       map.removeLayer(markersRef.current['captain_assigned']);
@@ -373,14 +393,14 @@ export default function MapView({
 
     nearbyCaptains.forEach((c) => {
       const key = `nearby_${c.id}`;
-      const svgIcon = VEHICLE_SVG_ICONS[c.vehicle_type] || VEHICLE_SVG_ICONS['BIKE'];
+      const vehicleSrc = VEHICLE_IMAGE_PATHS[c.vehicle_type] || VEHICLE_IMAGE_PATHS['BIKE'];
       const icon = L.divIcon({
-        html: `<div class="bg-slate-950/90 rounded-full p-1.5 shadow-md border border-slate-700/80 flex items-center justify-center hover:scale-110 transition-transform">
-            ${svgIcon}
+        html: `<div class="relative flex items-center justify-center filter drop-shadow-lg hover:scale-110 transition-transform" style="width: 28px; height: 42px;">
+            <img src="${vehicleSrc}" alt="${c.vehicle_type}" class="w-full h-full object-contain pointer-events-none" />
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        iconSize: [28, 42],
+        iconAnchor: [14, 21],
       });
 
       if (!markersRef.current[key]) {
@@ -390,7 +410,7 @@ export default function MapView({
       }
     });
 
-    // 6. Polyline Route Drawing
+    // 6. Layered High-Visibility Navigation Polyline Route Drawing
     if (polylineBgRef.current) {
       map.removeLayer(polylineBgRef.current);
       polylineBgRef.current = null;
@@ -401,18 +421,22 @@ export default function MapView({
     }
 
     if (routeCoordinates && routeCoordinates.length > 0) {
+      // Dark outer border line for contrast
       polylineBgRef.current = L.polyline(routeCoordinates, {
-        color: '#0f172a',
-        weight: 8,
-        opacity: 0.65,
+        color: '#020617',
+        weight: 10,
+        opacity: 0.7,
         lineCap: 'round',
+        lineJoin: 'round',
       }).addTo(map);
 
+      // Bright electric blue inner navigation line
       polylineFgRef.current = L.polyline(routeCoordinates, {
-        color: '#38bdf8',
-        weight: 4,
+        color: '#2563eb',
+        weight: 5,
         opacity: 0.95,
         lineCap: 'round',
+        lineJoin: 'round',
       }).addTo(map);
     }
   }, [customerLocation, pickupLocation, destinationLocation, captainLocation, nearbyCaptains, routeCoordinates, captainVehicleType]);

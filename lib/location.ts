@@ -15,7 +15,7 @@ export async function requestAndGetCurrentLocation(): Promise<[number, number] |
 
     const pos = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 5000,
       maximumAge: 0,
     });
 
@@ -27,26 +27,36 @@ export async function requestAndGetCurrentLocation(): Promise<[number, number] |
   }
 
   // 2. Browser standard geolocation fallback
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
-      resolve(null);
-      return;
+  if (typeof window !== 'undefined' && navigator.geolocation) {
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0,
+        });
+      });
+      if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
+        return [pos.coords.latitude, pos.coords.longitude];
+      }
+    } catch (browserErr) {
+      console.warn('Browser geolocation failed (e.g. non-secure HTTP origin):', browserErr);
     }
+  }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
-          resolve([pos.coords.latitude, pos.coords.longitude]);
-        } else {
-          resolve(null);
-        }
-      },
-      (err) => {
-        console.warn('Browser geolocation error:', err);
-        resolve(null);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  });
+  // 3. Free IP-based location fallback (for local HTTP testing on LAN)
+  try {
+    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return [data.latitude, data.longitude];
+      }
+    }
+  } catch (ipErr) {
+    console.warn('IP geolocation fallback failed:', ipErr);
+  }
+
+  return [28.6139, 77.209]; // Default Delhi NCR
 }
 
