@@ -285,9 +285,25 @@ export default function CustomerHomePage() {
 
   useEffect(() => {
     detectCurrentLocation();
+
+    // Continuous meter-to-meter customer GPS location tracking
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
+            setUserCoords([pos.coords.latitude, pos.coords.longitude]);
+          }
+        },
+        (err) => {
+          console.warn('Customer GPS watch error:', err);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
   }, []);
 
-  // 3. Fetch nearby captains
+  // 3. Fetch nearby captains (DB snapshot initial + Realtime Broadcast sub-second live updates)
   useEffect(() => {
     async function loadNearbyCaptains() {
       const { data } = await supabase
@@ -303,8 +319,44 @@ export default function CustomerHomePage() {
 
     loadNearbyCaptains();
     const interval = setInterval(loadNearbyCaptains, 10000);
-    return () => clearInterval(interval);
+
+    // Sub-second Realtime Broadcast channel for nearby captains live movement
+    const nearbyChannel = supabase
+      .channel('nearby_captains_live')
+      .on(
+        'broadcast',
+        { event: 'location_update' },
+        (payload) => {
+          const liveData = payload.payload;
+          if (!liveData || (!liveData.captain_id && !liveData.id)) return;
+          const captId = liveData.captain_id || liveData.id;
+          setNearbyCaptains((prev) => {
+            const index = prev.findIndex((c) => c.id === captId);
+            const updatedItem = {
+              id: captId,
+              latitude: liveData.latitude,
+              longitude: liveData.longitude,
+              heading: liveData.heading,
+              vehicle_type: liveData.vehicle_type,
+            };
+            if (index >= 0) {
+              const copy = [...prev];
+              copy[index] = { ...copy[index], ...updatedItem };
+              return copy;
+            } else {
+              return [...prev, updatedItem];
+            }
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(nearbyChannel);
+    };
   }, []);
+
 
   // 4A. Pickup Autocomplete Search
   useEffect(() => {
@@ -529,6 +581,16 @@ export default function CustomerHomePage() {
     const captChannel = supabase
       .channel(`captain_loc_${activeRide.captain_id}`)
       .on(
+        'broadcast',
+        { event: 'location_update' },
+        (payload) => {
+          const liveData = payload.payload;
+          if (liveData?.latitude && liveData?.longitude) {
+            setCaptainLiveLocation([liveData.latitude, liveData.longitude]);
+          }
+        }
+      )
+      .on(
         'postgres_changes',
         {
           event: 'UPDATE',
@@ -549,6 +611,7 @@ export default function CustomerHomePage() {
       supabase.removeChannel(captChannel);
     };
   }, [activeRide?.captain_id, activeRide?.status]);
+
 
   // 3-Second High-Frequency Live Ride & Captain Location Sync Loop (Zero Page Refresh)
   useEffect(() => {

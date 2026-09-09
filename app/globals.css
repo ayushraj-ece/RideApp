@@ -84,3 +84,9 @@
 .animate-pulse-subtle {
   animation: pulseSubtle 2s infinite ease-in-out;
 }
+
+/* Smooth Leaflet marker movement animation for real-time live location tracking */
+.leaflet-marker-icon {
+  transition: transform 0.4s linear !important;
+}
+

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/ui/Navbar';
 import MapContainer from '@/components/map/MapContainer';
@@ -188,6 +188,8 @@ export default function CaptainHomePage() {
     initCaptain();
   }, []);
 
+  const lastDbUpdateRef = useRef<number>(0);
+
   // 2. High-Accuracy GPS Location Tracker & Real-Time Sync Loop
   useEffect(() => {
     if ((!isOnline && !activeRide) || !captain || typeof window === 'undefined' || !navigator.geolocation) return;
@@ -197,25 +199,42 @@ export default function CaptainHomePage() {
       setGpsCoords(coords);
 
       if (captain?.id) {
-        const channel = supabase.channel(`captain_loc_${captain.id}`);
-        channel.send({
+        const payload = {
+          captain_id: captain.id,
+          latitude: lat,
+          longitude: lng,
+          heading: heading || null,
+          vehicle_type: captain.vehicle_type,
+          timestamp: Date.now(),
+        };
+
+        // 1. Direct channel for assigned customer
+        const captChannel = supabase.channel(`captain_loc_${captain.id}`);
+        captChannel.send({
           type: 'broadcast',
           event: 'location_update',
-          payload: {
-            captain_id: captain.id,
-            latitude: lat,
-            longitude: lng,
-            heading: heading || null,
-            timestamp: Date.now(),
-          },
+          payload,
+        });
+
+        // 2. Global channel for nearby customer map views
+        const globalChannel = supabase.channel('nearby_captains_live');
+        globalChannel.send({
+          type: 'broadcast',
+          event: 'location_update',
+          payload,
         });
       }
 
-      supabase.rpc('update_captain_location', {
-        p_captain_id: captain.id,
-        p_lat: lat,
-        p_lng: lng,
-      });
+      // Throttled database update (every 2 seconds)
+      const now = Date.now();
+      if (now - lastDbUpdateRef.current > 2000) {
+        lastDbUpdateRef.current = now;
+        supabase.rpc('update_captain_location', {
+          p_captain_id: captain.id,
+          p_lat: lat,
+          p_lng: lng,
+        });
+      }
 
       if (activeRide) {
         updateRouteForRide(activeRide, coords);
