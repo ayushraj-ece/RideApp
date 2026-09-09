@@ -286,24 +286,41 @@ export default function CustomerHomePage() {
   useEffect(() => {
     detectCurrentLocation();
 
-    // Continuous meter-to-meter customer GPS location tracking
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+
+    const syncCustomerGps = (lat: number, lng: number) => {
+      setUserCoords([lat, lng]);
+    };
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (pos?.coords?.latitude && pos?.coords?.longitude) {
+          syncCustomerGps(pos.coords.latitude, pos.coords.longitude);
+        }
+      },
+      (err) => console.warn('Customer GPS watch error:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+
+    const intervalId = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
         (pos) => {
-          if (pos && pos.coords && pos.coords.latitude && pos.coords.longitude) {
-            setUserCoords([pos.coords.latitude, pos.coords.longitude]);
+          if (pos?.coords?.latitude && pos?.coords?.longitude) {
+            syncCustomerGps(pos.coords.latitude, pos.coords.longitude);
           }
         },
-        (err) => {
-          console.warn('Customer GPS watch error:', err);
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+        null,
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
       );
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
+    }, 3000);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(intervalId);
+    };
   }, []);
 
-  // 3. Fetch nearby captains (DB snapshot initial + Realtime Broadcast sub-second live updates)
+  // 3. Fetch nearby captains (DB snapshot initial + Realtime Broadcast & Postgres changes live updates)
   useEffect(() => {
     async function loadNearbyCaptains() {
       const { data } = await supabase
@@ -318,10 +335,10 @@ export default function CustomerHomePage() {
     }
 
     loadNearbyCaptains();
-    const interval = setInterval(loadNearbyCaptains, 10000);
+    const interval = setInterval(loadNearbyCaptains, 5000);
 
-    // Sub-second Realtime Broadcast channel for nearby captains live movement
-    const nearbyChannel = supabase
+    // Channel 1: Sub-second Realtime Broadcast channel for nearby captains live movement
+    const nearbyBroadcastChannel = supabase
       .channel('nearby_captains_live')
       .on(
         'broadcast',
@@ -351,11 +368,50 @@ export default function CustomerHomePage() {
       )
       .subscribe();
 
+    // Channel 2: Realtime Postgres Changes listener for captains table updates
+    const nearbyDbChannel = supabase
+      .channel('nearby_captains_db_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'captains',
+        },
+        (payload) => {
+          const capt = payload.new;
+          if (capt.online_status && capt.availability_status === 'AVAILABLE' && capt.latitude && capt.longitude) {
+            setNearbyCaptains((prev) => {
+              const index = prev.findIndex((c) => c.id === capt.id);
+              const updatedItem = {
+                id: capt.id,
+                latitude: capt.latitude,
+                longitude: capt.longitude,
+                heading: capt.heading || null,
+                vehicle_type: capt.vehicle_type,
+              };
+              if (index >= 0) {
+                const copy = [...prev];
+                copy[index] = { ...copy[index], ...updatedItem };
+                return copy;
+              } else {
+                return [...prev, updatedItem];
+              }
+            });
+          } else {
+            setNearbyCaptains((prev) => prev.filter((c) => c.id !== capt.id));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(nearbyChannel);
+      supabase.removeChannel(nearbyBroadcastChannel);
+      supabase.removeChannel(nearbyDbChannel);
     };
   }, []);
+
 
 
   // 4A. Pickup Autocomplete Search

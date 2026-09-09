@@ -189,6 +189,38 @@ export default function CaptainHomePage() {
   }, []);
 
   const lastDbUpdateRef = useRef<number>(0);
+  const nearbyChannelRef = useRef<any>(null);
+  const assignedChannelRef = useRef<any>(null);
+
+  // Initialize and maintain active Realtime Broadcast channels while online
+  useEffect(() => {
+    if (!captain?.id || !isOnline) {
+      nearbyChannelRef.current = null;
+      assignedChannelRef.current = null;
+      return;
+    }
+
+    const globalChan = supabase.channel('nearby_captains_live');
+    globalChan.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        nearbyChannelRef.current = globalChan;
+      }
+    });
+
+    const captChan = supabase.channel(`captain_loc_${captain.id}`);
+    captChan.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        assignedChannelRef.current = captChan;
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(globalChan);
+      supabase.removeChannel(captChan);
+      nearbyChannelRef.current = null;
+      assignedChannelRef.current = null;
+    };
+  }, [captain?.id, isOnline]);
 
   // 2. High-Accuracy GPS Location Tracker & Real-Time Sync Loop
   useEffect(() => {
@@ -208,21 +240,23 @@ export default function CaptainHomePage() {
           timestamp: Date.now(),
         };
 
-        // 1. Direct channel for assigned customer
-        const captChannel = supabase.channel(`captain_loc_${captain.id}`);
-        captChannel.send({
-          type: 'broadcast',
-          event: 'location_update',
-          payload,
-        });
+        // Broadcast to assigned customer channel
+        if (assignedChannelRef.current) {
+          assignedChannelRef.current.send({
+            type: 'broadcast',
+            event: 'location_update',
+            payload,
+          });
+        }
 
-        // 2. Global channel for nearby customer map views
-        const globalChannel = supabase.channel('nearby_captains_live');
-        globalChannel.send({
-          type: 'broadcast',
-          event: 'location_update',
-          payload,
-        });
+        // Broadcast to global nearby captains channel
+        if (nearbyChannelRef.current) {
+          nearbyChannelRef.current.send({
+            type: 'broadcast',
+            event: 'location_update',
+            payload,
+          });
+        }
       }
 
       // Throttled database update (every 2 seconds)
@@ -261,6 +295,7 @@ export default function CaptainHomePage() {
       clearInterval(syncInterval);
     };
   }, [isOnline, captain?.id, activeRide?.id]);
+
 
   const updateRouteForRide = async (ride: Ride, currentPos: [number, number] | null) => {
     const origin = currentPos || [ride.pickup_lat, ride.pickup_lng];
