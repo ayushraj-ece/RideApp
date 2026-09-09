@@ -247,9 +247,6 @@ export default function CustomerHomePage() {
         setPickupAddress(ride.pickup_address);
         setPickupQuery(ride.pickup_address);
         setDestinationAddress(ride.destination_address);
-        setDestinationQuery(ride.destination_address);
-        fetchRoute([ride.pickup_lat, ride.pickup_lng], [ride.destination_lat, ride.destination_lng]);
-
         if (ride.captain_id) {
           fetchCaptainDetails(ride.captain_id);
         }
@@ -482,21 +479,93 @@ export default function CustomerHomePage() {
     }
   };
 
-  // Auto recalculate route whenever pickupCoords or destinationCoords update
+  // Dynamic Real-Time Route Recalculation based on Active Ride Status & Captain Position
   useEffect(() => {
-    if (pickupCoords && destinationCoords) {
-      fetchRoute(pickupCoords, destinationCoords);
-    } else {
-      setRouteCoords([]);
-      setDistanceKm(0);
+    let isCancelled = false;
+
+    async function updateDynamicRoute() {
+      // 1. Captain is arriving to pickup (ACCEPTED, CAPTAIN_ARRIVING, CAPTAIN_ARRIVED) -> Blue route from Captain to Pickup
+      if (
+        activeRide &&
+        ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status)
+      ) {
+        const captPos: [number, number] | null = captainLiveLocation ||
+          (assignedCaptain?.latitude && assignedCaptain?.longitude
+            ? [assignedCaptain.latitude, assignedCaptain.longitude]
+            : null);
+        const pickPos: [number, number] = [activeRide.pickup_lat, activeRide.pickup_lng];
+
+        if (captPos) {
+          const route = await getDirectionsRoute(captPos, pickPos);
+          if (!isCancelled) {
+            setRouteCoords(route.coordinates);
+            setDistanceKm(route.distanceKm);
+          }
+        } else if (pickupCoords && destinationCoords) {
+          const route = await getDirectionsRoute(pickupCoords, destinationCoords);
+          if (!isCancelled) {
+            setRouteCoords(route.coordinates);
+            setDistanceKm(route.distanceKm);
+          }
+        }
+      }
+      // 2. Trip in progress after OTP (OTP_VERIFIED, IN_PROGRESS) -> Blue route from Captain/Pickup to Destination
+      else if (
+        activeRide &&
+        ['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status)
+      ) {
+        const captPos: [number, number] | null = captainLiveLocation ||
+          pickupCoords ||
+          [activeRide.pickup_lat, activeRide.pickup_lng];
+        const dropPos: [number, number] = [activeRide.destination_lat, activeRide.destination_lng];
+
+        if (captPos && dropPos) {
+          const route = await getDirectionsRoute(captPos, dropPos);
+          if (!isCancelled) {
+            setRouteCoords(route.coordinates);
+            setDistanceKm(route.distanceKm);
+          }
+        }
+      }
+      // 3. Pre-booking search or searching state -> Blue route from Pickup to Destination
+      else if (pickupCoords && destinationCoords) {
+        const route = await getDirectionsRoute(pickupCoords, destinationCoords);
+        if (!isCancelled) {
+          setRouteCoords(route.coordinates);
+          setDistanceKm(route.distanceKm);
+        }
+      } else {
+        if (!isCancelled) {
+          setRouteCoords([]);
+          setDistanceKm(0);
+        }
+      }
     }
-  }, [pickupCoords, destinationCoords]);
+
+    updateDynamicRoute();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    activeRide?.status,
+    activeRide?.pickup_lat,
+    activeRide?.pickup_lng,
+    activeRide?.destination_lat,
+    activeRide?.destination_lng,
+    captainLiveLocation,
+    assignedCaptain?.latitude,
+    assignedCaptain?.longitude,
+    pickupCoords,
+    destinationCoords,
+  ]);
 
   const fetchRoute = async (start: [number, number], end: [number, number]) => {
     const route = await getDirectionsRoute(start, end);
     setRouteCoords(route.coordinates);
     setDistanceKm(route.distanceKm);
   };
+
 
   const fetchCaptainDetails = async (captainId: string) => {
     const { data: capt } = await supabase
@@ -1156,30 +1225,61 @@ export default function CustomerHomePage() {
                     </p>
                   )}
 
-                  {/* LIVE CAPTAIN DISTANCE FROM PICKUP & ETA BADGE */}
+                  {/* LIVE CAPTAIN DISTANCE & ETA BADGE */}
                   {(() => {
-                    if (!['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status) || !pickupCoords) {
-                      return null;
-                    }
-                    const captLat = captainLiveLocation ? captainLiveLocation[0] : (assignedCaptain?.latitude || pickupCoords[0] + 0.012);
-                    const captLng = captainLiveLocation ? captainLiveLocation[1] : (assignedCaptain?.longitude || pickupCoords[1] + 0.008);
-                    const distKm = calculateHaversineDistance(captLat, captLng, pickupCoords[0], pickupCoords[1]);
-                    const etaMins = Math.max(1, Math.ceil((distKm / 25) * 60));
+                    if (!activeRide) return null;
 
-                    return (
-                      <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 mt-2">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 animate-spin text-amber-500" />
-                          <span>
-                            {distKm < 0.1 ? 'Captain has arrived at pickup point' : `Arriving at pickup in ~${etaMins} mins`}
+                    if (['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status)) {
+                      const pickPos = pickupCoords || [activeRide.pickup_lat, activeRide.pickup_lng];
+                      const captLat = captainLiveLocation ? captainLiveLocation[0] : assignedCaptain?.latitude;
+                      const captLng = captainLiveLocation ? captainLiveLocation[1] : assignedCaptain?.longitude;
+
+                      const distKm = (captLat && captLng && pickPos)
+                        ? calculateHaversineDistance(captLat, captLng, pickPos[0], pickPos[1])
+                        : distanceKm;
+                      const etaMins = Math.max(1, Math.ceil((distKm / 25) * 60));
+
+                      return (
+                        <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4 animate-spin text-amber-500" />
+                            <span>
+                              {distKm < 0.1 ? 'Captain has arrived at pickup point' : `Arriving at pickup in ~${etaMins} mins`}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-amber-500/20">
+                            {distKm < 0.1 ? 'ARRIVED' : `${distKm} km away`}
                           </span>
                         </div>
-                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-amber-500/20">
-                          {distKm < 0.1 ? 'ARRIVED' : `${distKm} km away`}
-                        </span>
-                      </div>
-                    );
+                      );
+                    } else if (['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status)) {
+                      const dropPos = destinationCoords || [activeRide.destination_lat, activeRide.destination_lng];
+                      const captLat = captainLiveLocation ? captainLiveLocation[0] : (pickupCoords ? pickupCoords[0] : activeRide.pickup_lat);
+                      const captLng = captainLiveLocation ? captainLiveLocation[1] : (pickupCoords ? pickupCoords[1] : activeRide.pickup_lng);
+
+                      const distKm = (captLat && captLng && dropPos)
+                        ? calculateHaversineDistance(captLat, captLng, dropPos[0], dropPos[1])
+                        : activeRide.distance_km || distanceKm;
+                      const etaMins = Math.max(1, Math.ceil((distKm / 30) * 60));
+
+                      return (
+                        <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+                          <div className="flex items-center gap-1.5">
+                            <Navigation className="h-4 w-4 animate-pulse text-emerald-500" />
+                            <span>
+                              {distKm < 0.2 ? 'Reaching destination soon' : `On the way to destination (~${etaMins} mins)`}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-emerald-500/20">
+                            {distKm < 0.2 ? 'ARRIVING' : `${distKm} km remaining`}
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return null;
                   })()}
+
                 </div>
 
                 {/* CAPTAIN & VEHICLE CARD */}
