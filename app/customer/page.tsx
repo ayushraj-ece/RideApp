@@ -898,12 +898,12 @@ export default function CustomerHomePage() {
         ? [assignedCaptain.latitude, assignedCaptain.longitude]
         : null);
 
-    let targetLat = activeRide.pickup_latitude;
-    let targetLng = activeRide.pickup_longitude;
+    let targetLat = activeRide.pickup_lat;
+    let targetLng = activeRide.pickup_lng;
 
     if (['IN_PROGRESS', 'OTP_VERIFIED'].includes(activeRide.status)) {
-      targetLat = activeRide.destination_latitude;
-      targetLng = activeRide.destination_longitude;
+      targetLat = activeRide.destination_lat;
+      targetLng = activeRide.destination_lng;
     }
 
     if (activeRide.status === 'CAPTAIN_ARRIVED') {
@@ -922,7 +922,7 @@ export default function CustomerHomePage() {
       };
     }
 
-    const distKm = calculateHaversineDistance(captPos, [targetLat, targetLng]);
+    const distKm = calculateHaversineDistance(captPos[0], captPos[1], targetLat, targetLng);
     const etaMins = Math.max(1, Math.round((distKm / 22) * 60));
     const formattedDist = distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`;
 
