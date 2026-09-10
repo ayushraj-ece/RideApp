@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/ui/Navbar';
 import { createClient } from '@/lib/supabase/client';
 import { Ride, UserProfile } from '@/types/ride';
-import { History, Calendar, MapPin, Navigation, ArrowLeft, Loader2, Bike, Trash2 } from 'lucide-react';
+import { History, Calendar, MapPin, Navigation, ArrowLeft, Loader2, Bike } from 'lucide-react';
 import Link from 'next/link';
 
 import CaptainBottomNav from '@/components/ui/CaptainBottomNav';
@@ -13,7 +13,6 @@ export default function CaptainRidesPage() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [deletingOld, setDeletingOld] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -42,41 +41,6 @@ export default function CaptainRidesPage() {
     loadRides();
   }, []);
 
-  const handleDeleteOldRides = async () => {
-    if (!profile) return;
-    const confirmed = window.confirm('Are you sure you want to delete all trip history older than 10 days?');
-    if (!confirmed) return;
-
-    setDeletingOld(true);
-    try {
-      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
-      
-      const rpcRes = await supabase.rpc('delete_old_rides', { p_days_old: 10 });
-      let deletedCount = rpcRes.data?.deleted_count;
-
-      if (deletedCount == null) {
-        const { data: delData, error: delErr } = await supabase
-          .from('rides')
-          .delete()
-          .eq('captain_id', profile.id)
-          .lt('created_at', tenDaysAgo)
-          .select();
-        
-        if (delErr) throw delErr;
-        deletedCount = delData ? delData.length : 0;
-      }
-
-      const cutoffTime = new Date(tenDaysAgo).getTime();
-      setRides((prev) => prev.filter((r) => new Date(r.created_at).getTime() >= cutoffTime));
-
-      alert(deletedCount > 0 ? `Successfully deleted ${deletedCount} trip(s) older than 10 days!` : 'No trips older than 10 days were found.');
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete old trips.');
-    } finally {
-      setDeletingOld(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 font-sans pb-16">
       <Navbar
@@ -87,42 +51,20 @@ export default function CaptainRidesPage() {
       />
 
       <main className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/captain"
-              className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm transition-transform active:scale-95 shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <History className="h-5 w-5 text-amber-500 shrink-0" />
-                Completed Rides
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">History of accepted and completed customer rides</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-slate-700/60">
-              <Calendar className="h-3 w-3 text-amber-500" />
-              <span>Auto-Purge &gt;10 Days</span>
-            </span>
-
-            <button
-              onClick={handleDeleteOldRides}
-              disabled={deletingOld || loading || rides.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-xs font-bold transition-transform active:scale-95 disabled:opacity-50"
-              title="Purge trips older than 10 days"
-            >
-              {deletingOld ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5" />
-              )}
-              <span>Purge Now</span>
-            </button>
+        {/* CLEAN HEADER */}
+        <div className="flex items-center gap-3 mb-6">
+          <Link
+            href="/captain"
+            className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white shadow-sm transition-transform active:scale-95 shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <History className="h-5 w-5 text-amber-500 shrink-0" />
+              Completed Rides
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">History of accepted and completed customer rides</p>
           </div>
         </div>
 
