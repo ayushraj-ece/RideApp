@@ -1502,22 +1502,15 @@ export default function CustomerHomePage() {
 
                         {/* RIGHT: PIN AND MINIMIZE */}
                         <div className="flex items-center gap-2 shrink-0">
-                          {/* INLINE CLEAN PIN BADGE */}
-                          {!['COMPLETED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) ? (
+                          {/* INLINE CLEAN PIN BADGE FOR STANDARD RIDES ONLY */}
+                          {!activeRide.is_parcel && !['COMPLETED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
                               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">PIN</span>
                               <span className="font-mono font-bold text-xs">
                                 {activeRide.otp || '0000'}
                               </span>
                             </div>
-                          ) : activeRide.is_parcel && activeRide.drop_otp ? (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
-                              <span className="text-[10px] font-extrabold text-emerald-500 uppercase tracking-wider">DROP</span>
-                              <span className="font-mono font-bold text-xs">
-                                {activeRide.drop_otp}
-                              </span>
-                            </div>
-                          ) : null}
+                          )}
 
                           <button
                             onClick={() => setIsCustomerSheetCollapsed(true)}
@@ -1620,7 +1613,7 @@ export default function CustomerHomePage() {
                       </div>
                     )}
 
-                    {/* ROUTE LOCATION CARD */}
+                    {/* ROUTE LOCATION CARD WITH INLINE PARCEL OTPS */}
                     <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative">
                       <div className="relative pl-5 space-y-3.5">
                         {/* Timeline vertical connector line */}
@@ -1630,8 +1623,17 @@ export default function CustomerHomePage() {
                         <div className="relative flex items-start justify-between gap-2">
                           <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Pickup Point</span>
-                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.pickup_address}</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
+                                Pickup Point
+                              </span>
+                              {activeRide.is_parcel && (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-800 dark:text-amber-300 font-mono font-extrabold text-[10.5px] border border-amber-400/30">
+                                  OTP: {activeRide.otp || '----'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">{activeRide.pickup_address}</p>
                           </div>
                         </div>
 
@@ -1647,61 +1649,45 @@ export default function CustomerHomePage() {
                         <div className="relative flex items-start justify-between gap-2">
                           <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Drop Location</span>
-                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.destination_address}</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">
+                                Drop Location
+                              </span>
+                              {activeRide.is_parcel && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-mono font-extrabold text-[10.5px] border border-emerald-500/30">
+                                  DROP OTP: {activeRide.drop_otp || (activeRide as any).dropOtp || '----'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">{activeRide.destination_address}</p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* PARCEL DELIVERIES DUAL OTP DISPLAY CARD */}
+                    {/* ELEGANT & COMPACT PAYMENT TIMING RULE BANNER */}
                     {activeRide.is_parcel && (
-                      <div className="space-y-2.5">
-                        <div className="p-3.5 rounded-2xl bg-amber-400/10 border border-amber-400/30 dark:bg-amber-400/10 flex items-center justify-around gap-2 shadow-2xs">
-                          <div className="text-center flex-1">
-                            <span className="text-[9.5px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                              1. Pickup OTP
+                      <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-2xs ${
+                        activeRide.pay_at === 'PICKUP'
+                          ? 'bg-amber-400/15 border-amber-400/40 text-slate-900 dark:text-slate-100'
+                          : 'bg-blue-500/10 border-blue-500/25 text-slate-900 dark:text-slate-100'
+                      }`}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Wallet className="h-4 w-4 text-amber-500 shrink-0" />
+                          <div>
+                            <span className="font-extrabold text-[11px] uppercase tracking-wider block">
+                              Payment Rule: Pay at {activeRide.pay_at || 'Pickup'}
                             </span>
-                            <span className="font-mono font-black text-sm text-slate-900 dark:text-slate-100 tracking-wider">
-                              {activeRide.otp || '----'}
+                            <span className="text-[10.5px] text-slate-600 dark:text-slate-400 font-medium block mt-0.5">
+                              {activeRide.pay_at === 'PICKUP'
+                                ? 'Pay ₹' + activeRide.estimated_fare + ' to Captain at pickup location before transit'
+                                : 'Recipient pays ₹' + activeRide.estimated_fare + ' to Captain at drop location after Drop OTP'}
                             </span>
-                            <span className="text-[9px] text-slate-400 block mt-0.5">Share with captain at pickup</span>
-                          </div>
-                          <div className="h-8 w-px bg-amber-400/30 shrink-0" />
-                          <div className="text-center flex-1">
-                            <span className="text-[9.5px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
-                              2. Drop-off OTP
-                            </span>
-                            <span className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 tracking-wider">
-                              {activeRide.drop_otp || (activeRide as any).dropOtp || '----'}
-                            </span>
-                            <span className="text-[9px] text-slate-400 block mt-0.5">Share with recipient at drop</span>
                           </div>
                         </div>
-
-                        {/* PAYMENT TIMING RULE BANNER */}
-                        <div className={`p-3 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-2xs ${
-                          activeRide.pay_at === 'PICKUP'
-                            ? 'bg-amber-400/15 border-amber-400/40 text-amber-950 dark:text-amber-200'
-                            : 'bg-blue-500/10 border-blue-500/30 text-blue-950 dark:text-blue-200'
-                        }`}>
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Wallet className="h-4 w-4 text-amber-500 shrink-0" />
-                            <div>
-                              <p className="font-extrabold text-[11px] uppercase tracking-wider">
-                                Payment Rule: Pay at {activeRide.pay_at || 'Pickup'}
-                              </p>
-                              <p className="text-[10.5px] opacity-80 font-medium mt-0.5">
-                                {activeRide.pay_at === 'PICKUP'
-                                  ? 'Pay ₹' + activeRide.estimated_fare + ' to Captain now at pickup before transit starts'
-                                  : 'Recipient pays ₹' + activeRide.estimated_fare + ' to Captain at drop location after Drop OTP'}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-black text-xs shrink-0">
-                            ₹{activeRide.estimated_fare}
-                          </span>
-                        </div>
+                        <span className="font-black text-sm shrink-0 text-slate-900 dark:text-slate-100">
+                          ₹{activeRide.estimated_fare}
+                        </span>
                       </div>
                     )}
 
