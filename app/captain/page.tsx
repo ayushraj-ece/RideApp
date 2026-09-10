@@ -80,6 +80,7 @@ export default function CaptainHomePage() {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCaptainProfileOpen, setIsCaptainProfileOpen] = useState(false);
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
+  const [isLocationExpanded, setIsLocationExpanded] = useState(false);
 
   const lastDbUpdateRef = useRef<number>(0);
   const nearbyChannelRef = useRef<any>(null);
@@ -676,67 +677,75 @@ export default function CaptainHomePage() {
           />
         </div>
 
-        {/* UNIFIED SINGLE FLOATING HEADER CARD */}
+        {/* UNIFIED MINIMAL FLOATING HEADER CARD */}
         <div className="absolute top-3.5 inset-x-3.5 z-10 max-w-md mx-auto pointer-events-auto">
-          <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xl backdrop-blur-sm space-y-2">
-            {/* ROW 1: EARNINGS & TRIPS + ONLINE STATUS TOGGLE */}
+          <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 sm:p-3 shadow-xl backdrop-blur-sm transition-all space-y-2">
+            {/* MAIN ALWAYS-VISIBLE SINGLE ROW: EARNINGS & TRIPS + ONLINE STATUS + TINY LOCATION DROPDOWN */}
             <div className="flex items-center justify-between gap-3">
-              {/* Earnings & Trips Info */}
-              <div className="min-w-0 flex-1">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
-                  Today's Earnings
+              {/* Left: Earnings & Trips */}
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-sans tracking-tight">
+                  ₹{todayEarnings.toFixed(0)}
                 </span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-base font-black text-slate-900 dark:text-white font-sans tracking-tight">
-                    ₹{todayEarnings.toFixed(0)}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
-                    {completedTripsCount} {completedTripsCount === 1 ? 'Trip' : 'Trips'}
-                  </span>
-                </div>
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 shrink-0">
+                  {completedTripsCount} {completedTripsCount === 1 ? 'Trip' : 'Trips'}
+                </span>
               </div>
 
-              {/* Online / Offline Toggle Button */}
-              <button
-                onClick={toggleOnlineStatus}
-                className={`px-3.5 py-1.5 rounded-full font-black text-[11px] tracking-wider uppercase shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border shrink-0 ${
-                  isOnline
-                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-400 shadow-emerald-500/20'
-                    : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-200 border-slate-700'
-                }`}
-              >
-                {isOnline ? (
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-950" />
-                  </span>
-                ) : (
-                  <span className="h-2 w-2 rounded-full bg-rose-500" />
-                )}
-                <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-              </button>
+              {/* Right: Online Toggle Button + Tiny Location Dropdown */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={toggleOnlineStatus}
+                  className={`px-3 py-1.5 rounded-full font-black text-[11px] tracking-wider uppercase shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border ${
+                    isOnline
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-400 shadow-emerald-500/20'
+                      : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-200 border-slate-700'
+                  }`}
+                >
+                  {isOnline ? (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-950" />
+                    </span>
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-rose-500" />
+                  )}
+                  <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+                </button>
+
+                {/* Tiny Location Dropdown Button */}
+                <button
+                  onClick={() => setIsLocationExpanded(!isLocationExpanded)}
+                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors border border-slate-200/60 dark:border-slate-700/60"
+                  title={isLocationExpanded ? "Hide location details" : "Show location details"}
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isLocationExpanded ? 'rotate-180 text-amber-500' : ''}`} />
+                </button>
+              </div>
             </div>
 
-            {/* ROW 2: PROPER LOCATION INDICATOR */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
-              <button
-                onClick={detectCaptainLocation}
-                className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity group flex-1"
-                title="Click to refresh GPS location"
-              >
-                <div className="h-5 w-5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                  <Crosshair
-                    className={`h-3 w-3 ${isDetectingGps ? 'animate-spin text-amber-500' : ''}`}
-                  />
-                </div>
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate group-hover:text-amber-500 transition-colors">
-                  {captainAddress}
+            {/* EXPANDABLE LOCATION DROPDOWN ROW */}
+            {isLocationExpanded && (
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                <button
+                  onClick={detectCaptainLocation}
+                  className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity group flex-1"
+                  title="Click to refresh GPS location"
+                >
+                  <div className="h-5 w-5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <Crosshair
+                      className={`h-3 w-3 ${isDetectingGps ? 'animate-spin text-amber-500' : ''}`}
+                    />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate group-hover:text-amber-500 transition-colors">
+                    {captainAddress}
+                  </span>
+                </button>
+                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/20 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> GPS
                 </span>
-              </button>
-              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/20 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> GPS
-              </span>
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
