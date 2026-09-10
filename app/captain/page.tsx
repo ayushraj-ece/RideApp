@@ -677,58 +677,65 @@ export default function CaptainHomePage() {
         </div>
 
         {/* UNIFIED SINGLE FLOATING HEADER CARD */}
-        <div className="absolute top-4 inset-x-4 z-10 max-w-md mx-auto pointer-events-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xl space-y-2.5">
+        <div className="absolute top-3.5 inset-x-3.5 z-10 max-w-md mx-auto pointer-events-auto">
+          <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xl backdrop-blur-sm space-y-2">
             {/* ROW 1: EARNINGS & TRIPS + ONLINE STATUS TOGGLE */}
             <div className="flex items-center justify-between gap-3">
               {/* Earnings & Trips Info */}
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
-                  <DollarSign className="h-4 w-4 stroke-[2.5]" />
-                </div>
-                <div>
-                  <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block">
-                    Today's Earnings
+              <div className="min-w-0 flex-1">
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 block">
+                  Today's Earnings
+                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-base font-black text-slate-900 dark:text-white font-sans tracking-tight">
+                    ₹{todayEarnings.toFixed(0)}
                   </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-black text-slate-900 dark:text-slate-100">
-                      ₹{todayEarnings.toFixed(0)}
-                    </span>
-                    <span className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500">
-                      • {completedTripsCount} {completedTripsCount === 1 ? 'Trip' : 'Trips'}
-                    </span>
-                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+                    {completedTripsCount} {completedTripsCount === 1 ? 'Trip' : 'Trips'}
+                  </span>
                 </div>
               </div>
 
               {/* Online / Offline Toggle Button */}
               <button
                 onClick={toggleOnlineStatus}
-                className={`px-3.5 py-2 rounded-xl font-extrabold text-xs tracking-wider uppercase shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border shrink-0 ${
+                className={`px-3.5 py-1.5 rounded-full font-black text-[11px] tracking-wider uppercase shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border shrink-0 ${
                   isOnline
-                    ? 'bg-emerald-500 text-slate-950 border-emerald-400 hover:bg-emerald-400'
-                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-800 hover:bg-slate-800'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-400 shadow-emerald-500/20'
+                    : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-200 border-slate-700'
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-slate-950 animate-pulse' : 'bg-rose-500'}`} />
+                {isOnline ? (
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-950" />
+                  </span>
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-rose-500" />
+                )}
                 <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
               </button>
             </div>
 
-            {/* ROW 2: LIVE GPS LOCATION DIVIDER LINE */}
+            {/* ROW 2: PROPER LOCATION INDICATOR */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
               <button
                 onClick={detectCaptainLocation}
-                className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity group"
-                title="Click to refresh current location"
+                className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity group flex-1"
+                title="Click to refresh GPS location"
               >
-                <Crosshair
-                  className={`h-3.5 w-3.5 shrink-0 ${isDetectingGps ? 'animate-spin text-amber-500' : 'text-emerald-500'}`}
-                />
+                <div className="h-5 w-5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                  <Crosshair
+                    className={`h-3 w-3 ${isDetectingGps ? 'animate-spin text-amber-500' : ''}`}
+                  />
+                </div>
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate group-hover:text-amber-500 transition-colors">
                   {captainAddress}
                 </span>
               </button>
+              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/20 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> GPS
+              </span>
             </div>
           </div>
         </div>
