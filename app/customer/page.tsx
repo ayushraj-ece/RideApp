@@ -167,6 +167,8 @@ export default function CustomerHomePage() {
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'RIDE' | 'PARCEL' | 'PROFILE'>('RIDE');
   const [parcelPayAt, setParcelPayAt] = useState<'PICKUP' | 'DROP'>('PICKUP');
+  const [receiverName, setReceiverName] = useState('');
+  const [receiverPhone, setReceiverPhone] = useState('');
   const [isProhibitedModalOpen, setIsProhibitedModalOpen] = useState(false);
   const [isCustomerSheetCollapsed, setIsCustomerSheetCollapsed] = useState(false);
   const [isBookingSheetCollapsed, setIsBookingSheetCollapsed] = useState(false);
@@ -729,7 +731,9 @@ export default function CustomerHomePage() {
         is_parcel: isParcelOrder,
         pay_at: parcelPayAt,
         drop_otp: dropOtpCode,
-      };
+        receiver_name: receiverName.trim() || 'Recipient',
+        receiver_phone: receiverPhone.trim() || '',
+      } as any;
 
       setActiveRide(activeRideObj);
       setIsCustomerSheetCollapsed(false);
@@ -1563,14 +1567,51 @@ export default function CustomerHomePage() {
                               <Phone className="h-4 w-4" />
                             </a>
                           )}
-                          <button
-                            onClick={() => setIsChatOpen(true)}
-                            className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold hover:bg-amber-300 transition-colors shadow-sm"
-                            title="Chat with Captain"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </button>
+                          {/* CHAT ONLY AVAILABLE BEFORE OTP VERIFIED AT PICKUP */}
+                          {!['OTP_VERIFIED', 'IN_PROGRESS', 'COMPLETED'].includes(activeRide.status) && (
+                            <button
+                              onClick={() => setIsChatOpen(true)}
+                              className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold hover:bg-amber-300 transition-colors shadow-sm"
+                              title="Chat with Captain before pickup"
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* PARCEL RECEIVER DETAILS CARD */}
+                    {activeRide.is_parcel && ((activeRide as any).receiver_name || (activeRide as any).receiver_phone) && (
+                      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center shrink-0">
+                            <User className="h-4.5 w-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[9.5px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                              Parcel Receiver (At Drop)
+                            </span>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                              {(activeRide as any).receiver_name || 'Recipient'}
+                            </p>
+                            {(activeRide as any).receiver_phone && (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono font-semibold">
+                                {(activeRide as any).receiver_phone}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {(activeRide as any).receiver_phone && (
+                          <a
+                            href={`tel:${(activeRide as any).receiver_phone}`}
+                            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
+                            title="Call Receiver"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                            <span>Call Receiver</span>
+                          </a>
+                        )}
                       </div>
                     )}
 
@@ -2061,38 +2102,86 @@ export default function CustomerHomePage() {
                       </div>
 
                       {activeBottomTab === 'PARCEL' ? (
-                        /* SINGLE PARCEL BIKE VEHICLE CARD (MATCHING SCREENSHOT 2 - ONLY BIKE ALLOWED) */
-                        <div className="rounded-2xl border-2 border-slate-900 dark:border-slate-100 bg-amber-400/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between shadow-sm relative">
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
-                          <div className="flex items-center gap-3.5 pl-1">
-                            <div className="h-12 w-14 flex items-center justify-center shrink-0">
-                              {/* eslint-disable-next-html-element-for-img */}
-                              <img
-                                src="/icons/parcel.png"
-                                alt="Parcel Bike"
-                                className="h-10 w-14 object-contain"
-                              />
+                        /* SINGLE PARCEL BIKE VEHICLE CARD + RECEIVER DETAILS INPUT */
+                        <div className="space-y-3">
+                          <div className="rounded-2xl border-2 border-slate-900 dark:border-slate-100 bg-amber-400/10 dark:bg-amber-400/10 p-3.5 flex items-center justify-between shadow-sm relative">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
+                            <div className="flex items-center gap-3.5 pl-1">
+                              <div className="h-12 w-14 flex items-center justify-center shrink-0">
+                                {/* eslint-disable-next-html-element-for-img */}
+                                <img
+                                  src="/icons/parcel.png"
+                                  alt="Parcel Bike"
+                                  className="h-10 w-14 object-contain"
+                                />
+                              </div>
+
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                                    Parcel
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-700 dark:text-amber-300 font-extrabold text-[9px] uppercase">
+                                    Fastest Bike
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                  Send upto 20 kgs • {calculateEstimatedTimeMinutes(distanceKm, 'BIKE')} mins away
+                                </p>
+                              </div>
                             </div>
 
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                                  Parcel
-                                </span>
-                                <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-700 dark:text-amber-300 font-extrabold text-[9px] uppercase">
-                                  Fastest Bike
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                                Send upto 20 kgs • {calculateEstimatedTimeMinutes(distanceKm, 'BIKE')} mins away
-                              </p>
+                            <div className="text-right">
+                              <span className="font-black text-base text-slate-900 dark:text-slate-100">
+                                ₹{getFareBreakdown(distanceKm, 'BIKE').totalFare}
+                              </span>
                             </div>
                           </div>
 
-                          <div className="text-right">
-                            <span className="font-black text-base text-slate-900 dark:text-slate-100">
-                              ₹{getFareBreakdown(distanceKm, 'BIKE').totalFare}
-                            </span>
+                          {/* RECIPIENT / RECEIVER DETAILS INPUT CARD */}
+                          <div className="rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-2.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-amber-500 shrink-0" />
+                                <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                                  Receiver's Contact Details
+                                </span>
+                              </div>
+                              <span className="text-[9.5px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                                At Drop Location
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium">
+                              Rider will call this contact upon reaching the drop location.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                              <div>
+                                <label className="text-[9.5px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+                                  Receiver Name
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Rahul Sharma"
+                                  value={receiverName}
+                                  onChange={(e) => setReceiverName(e.target.value)}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-amber-400 transition-colors text-slate-900 dark:text-slate-100 shadow-2xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[9.5px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">
+                                  Receiver Mobile Number
+                                </label>
+                                <input
+                                  type="tel"
+                                  maxLength={10}
+                                  placeholder="e.g. 9876543210"
+                                  value={receiverPhone}
+                                  onChange={(e) => setReceiverPhone(e.target.value.replace(/\D/g, ''))}
+                                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-amber-400 transition-colors text-slate-900 dark:text-slate-100 shadow-2xs"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ) : (

@@ -890,18 +890,56 @@ export default function CaptainHomePage() {
                       <a
                         href={`tel:${activeRide.customer.phone}`}
                         className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:text-amber-500 transition-colors"
+                        title="Call Customer/Sender"
                       >
                         <Phone className="h-4 w-4" />
                       </a>
                     )}
-                    <button
-                      onClick={() => setIsChatOpen(true)}
-                      className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:text-amber-500 transition-colors"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </button>
+                    {/* CHAT ONLY AVAILABLE BEFORE OTP VERIFIED AT PICKUP */}
+                    {!['OTP_VERIFIED', 'IN_PROGRESS', 'COMPLETED'].includes(activeRide.status) && (
+                      <button
+                        onClick={() => setIsChatOpen(true)}
+                        className="h-9 w-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:text-amber-500 transition-colors"
+                        title="Chat with Customer before pickup"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* PARCEL RECEIVER CONTACT CARD FOR CAPTAIN */}
+                {activeRide.is_parcel && (
+                  <div className="p-3.5 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9.5 w-9.5 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-bold">
+                        <User className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[9.5px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                          Drop Receiver Contact
+                        </span>
+                        <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+                          {(activeRide as any).receiver_name || (activeRide as any).receiverName || 'Recipient at Drop'}
+                        </p>
+                        <p className="text-[11px] font-mono text-slate-600 dark:text-slate-400 font-bold">
+                          {(activeRide as any).receiver_phone || (activeRide as any).receiverPhone || 'Phone at drop'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {((activeRide as any).receiver_phone || (activeRide as any).receiverPhone) && (
+                      <a
+                        href={`tel:${(activeRide as any).receiver_phone || (activeRide as any).receiverPhone}`}
+                        className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 shrink-0"
+                        title="Call Parcel Receiver"
+                      >
+                        <Phone className="h-3.5 w-3.5 fill-slate-950" />
+                        <span>Call Receiver</span>
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Pickup & Destination Address */}
                 <div className="space-y-2.5 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-xs">
