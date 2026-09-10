@@ -29,12 +29,12 @@ export default function CustomerBottomNav({ activeTab, onTabSelect }: CustomerBo
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 w-full border-t border-slate-200 dark:border-[#233430] bg-white dark:bg-[#111816] px-6 py-2.5 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-2xl">
+    <div className="fixed bottom-0 inset-x-0 z-50 w-full h-13 sm:h-14 border-t border-slate-100 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md px-6 py-1.5 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-xl">
       <button
         onClick={() => handleSelect('RIDE')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'RIDE'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-extrabold scale-105'
+            ? 'text-amber-500 font-extrabold scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -46,7 +46,7 @@ export default function CustomerBottomNav({ activeTab, onTabSelect }: CustomerBo
         onClick={() => handleSelect('PARCEL')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'PARCEL'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-extrabold scale-105'
+            ? 'text-amber-500 font-extrabold scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -58,7 +58,7 @@ export default function CustomerBottomNav({ activeTab, onTabSelect }: CustomerBo
         onClick={() => handleSelect('PROFILE')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'PROFILE'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-extrabold scale-105'
+            ? 'text-amber-500 font-extrabold scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -68,4 +68,3 @@ export default function CustomerBottomNav({ activeTab, onTabSelect }: CustomerBo
     </div>
   );
 }
-

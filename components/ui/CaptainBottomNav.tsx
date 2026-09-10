@@ -39,12 +39,12 @@ export default function CaptainBottomNav({ activeTab, onTabSelect }: CaptainBott
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 w-full border-t border-slate-200 dark:border-[#233430] bg-white dark:bg-[#111816] px-4 sm:px-8 py-2 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-2xl">
+    <div className="fixed bottom-0 inset-x-0 z-50 w-full border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 sm:px-8 py-2 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-2xl">
       <button
         onClick={() => handleSelect('DUTY')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'DUTY'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-black scale-105'
+            ? 'text-amber-500 font-black scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -56,7 +56,7 @@ export default function CaptainBottomNav({ activeTab, onTabSelect }: CaptainBott
         onClick={() => handleSelect('EARNINGS')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'EARNINGS'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-black scale-105'
+            ? 'text-amber-500 font-black scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -68,7 +68,7 @@ export default function CaptainBottomNav({ activeTab, onTabSelect }: CaptainBott
         onClick={() => handleSelect('TRIPS')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'TRIPS'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-black scale-105'
+            ? 'text-amber-500 font-black scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -80,7 +80,7 @@ export default function CaptainBottomNav({ activeTab, onTabSelect }: CaptainBott
         onClick={() => handleSelect('PROFILE')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${
           currentTab === 'PROFILE'
-            ? 'text-[#143d30] dark:text-[#8fbf7f] font-black scale-105'
+            ? 'text-amber-500 font-black scale-105'
             : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
@@ -90,4 +90,3 @@ export default function CaptainBottomNav({ activeTab, onTabSelect }: CaptainBott
     </div>
   );
 }
-

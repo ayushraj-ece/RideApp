@@ -95,7 +95,7 @@ export default function ProfileDrawer({
   const isCaptain = role === 'CAPTAIN';
 
   return (
-    <div className="fixed inset-x-0 top-14 bottom-14 z-40 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between overflow-y-auto font-sans transition-colors duration-200 p-4 sm:p-6 pb-24 animate-in slide-in-from-bottom duration-200">
+    <div className="fixed inset-x-0 top-9 sm:top-9.5 bottom-0 z-40 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between overflow-y-auto font-sans transition-colors duration-200 p-4 sm:p-6 pb-18 sm:pb-20 animate-in slide-in-from-bottom duration-200">
       <div className="max-w-md mx-auto w-full space-y-4">
         {/* HEADER BAR */}
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">

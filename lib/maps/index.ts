@@ -4,6 +4,8 @@ export interface MapSearchResult {
   display_name: string;
   lat: number;
   lng: number;
+  distanceKm?: number;
+  source?: string;
 }
 
 export interface RouteData {
@@ -41,10 +43,14 @@ export function calculateHaversineDistance(
 }
 
 /**
- * Multi-Engine High-Accuracy Geocoding Search (Photon + Nominatim + Google Places)
- * Returns up-to-date local places, shops, apartments, metro stations, airports, tech parks & landmarks
+ * Multi-Engine Real-Time High-Accuracy Geocoding Search
+ * (ArcGIS World Geocode Engine + Komoot Photon + OpenStreetMap Nominatim + Google Places)
+ * Includes GPS Proximity Biasing so nearby local places, shops, societies, metro stations, tech parks & airports rank first!
  */
-export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
+export async function searchGeocode(
+  query: string,
+  userCoords?: [number, number] | null
+): Promise<MapSearchResult[]> {
   if (!query || query.trim().length < 2) return [];
 
   const cleanQuery = query.trim();
@@ -53,9 +59,10 @@ export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
   // 1. Google Maps Geocoding API if API key is provided
   if (googleApiKey) {
     try {
-      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-        cleanQuery
-      )}&key=${googleApiKey}`;
+      let googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanQuery)}&key=${googleApiKey}`;
+      if (userCoords) {
+        googleUrl += `&location=${userCoords[0]},${userCoords[1]}`;
+      }
       const gRes = await fetch(googleUrl);
       if (gRes.ok) {
         const gData = await gRes.json();
@@ -64,12 +71,19 @@ export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
             const parts = item.formatted_address.split(',');
             const title = parts[0]?.trim() || item.formatted_address;
             const subtitle = parts.slice(1, 4).join(',').trim() || item.formatted_address;
+            const lat = item.geometry.location.lat;
+            const lng = item.geometry.location.lng;
+            const distanceKm = userCoords
+              ? calculateHaversineDistance(userCoords[0], userCoords[1], lat, lng)
+              : undefined;
             return {
               title,
               subtitle,
               display_name: item.formatted_address,
-              lat: item.geometry.location.lat,
-              lng: item.geometry.location.lng,
+              lat,
+              lng,
+              distanceKm,
+              source: 'Google Maps',
             };
           });
         }
@@ -79,73 +93,143 @@ export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
     }
   }
 
-  // 2. Parallel Multi-Engine Search (Photon + Nominatim) for instant, up-to-date place search
+  // Fallback defaults if userCoords is null (e.g. New Delhi NCR)
+  const defaultLat = userCoords ? userCoords[0] : 28.6139;
+  const defaultLng = userCoords ? userCoords[1] : 77.2090;
+
+  // 2. Parallel Multi-Engine Geocoding: ArcGIS World Geocoding + Photon Komoot + OSM Nominatim
+  const arcgisPromise = (async (): Promise<MapSearchResult[]> => {
+    try {
+      const suggestUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/suggest?text=${encodeURIComponent(cleanQuery)}&f=json&location=${defaultLng},${defaultLat}&maxSuggestions=8`;
+      const sRes = await fetch(suggestUrl);
+      if (!sRes.ok) return [];
+      const sData = await sRes.json();
+      const suggestions = (sData.suggestions || []).slice(0, 7);
+
+      const items = await Promise.all(
+        suggestions.map(async (s: any) => {
+          if (!s.isCollection && s.magicKey) {
+            try {
+              const resolveUrl = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&magicKey=${encodeURIComponent(s.magicKey)}&outFields=Match_addr,Addr_type,PlaceName,City,StAddr`;
+              const rRes = await fetch(resolveUrl);
+              if (rRes.ok) {
+                const rData = await rRes.json();
+                if (rData.candidates && rData.candidates[0]) {
+                  const c = rData.candidates[0];
+                  const fullText = s.text;
+                  const parts = fullText.split(',');
+                  const title = parts[0]?.trim() || c.attributes?.PlaceName || c.address;
+                  const subtitle = parts.slice(1, 4).join(',').trim() || fullText;
+                  const lat = c.location.y;
+                  const lng = c.location.x;
+                  return {
+                    title,
+                    subtitle,
+                    display_name: fullText,
+                    lat,
+                    lng,
+                    source: 'ArcGIS World',
+                  };
+                }
+              }
+            } catch (e) {
+              // ignore single item resolve error
+            }
+          }
+          return null;
+        })
+      );
+      return items.filter((item): item is MapSearchResult => item !== null);
+    } catch (e) {
+      console.warn('ArcGIS geocoding failed:', e);
+      return [];
+    }
+  })();
+
+  const photonPromise = (async (): Promise<MapSearchResult[]> => {
+    try {
+      let photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=8&lat=${defaultLat}&lon=${defaultLng}`;
+      const res = await fetch(photonUrl);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const items: MapSearchResult[] = [];
+      (data.features || []).forEach((feature: any) => {
+        const props = feature.properties || {};
+        const coords = feature.geometry?.coordinates; // [lng, lat]
+        if (coords && coords.length >= 2) {
+          const lng = coords[0];
+          const lat = coords[1];
+
+          const title = props.name || props.street || props.housenumber || props.district || 'Location';
+          const subtitleParts = [
+            props.street && props.name !== props.street ? props.street : null,
+            props.district || props.suburb || props.neighbourhood,
+            props.city || props.town || props.county,
+            props.state,
+          ].filter(Boolean);
+
+          const subtitle = subtitleParts.join(', ') || props.country || 'Location';
+          const display_name = [title, subtitle].filter(Boolean).join(', ');
+          items.push({ title, subtitle, display_name, lat, lng, source: 'Komoot Photon' });
+        }
+      });
+      return items;
+    } catch (e) {
+      console.warn('Photon geocoding failed:', e);
+      return [];
+    }
+  })();
+
+  const nominatimPromise = (async (): Promise<MapSearchResult[]> => {
+    try {
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&limit=6&addressdetails=1&lat=${defaultLat}&lon=${defaultLng}`;
+      const res = await fetch(nominatimUrl, {
+        headers: { 'User-Agent': 'RIDEON/2.0' },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data || []).map((item: any) => {
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        const parts = (item.display_name || '').split(',');
+        const title = parts[0]?.trim() || item.name || 'Location';
+        const subtitle = parts.slice(1, 4).join(',').trim() || item.display_name;
+        return { title, subtitle, display_name: item.display_name, lat, lng, source: 'OSM Nominatim' };
+      });
+    } catch (e) {
+      console.warn('Nominatim geocoding failed:', e);
+      return [];
+    }
+  })();
+
+  const [arcgisResults, photonResults, nominatimResults] = await Promise.all([
+    arcgisPromise,
+    photonPromise,
+    nominatimPromise,
+  ]);
+
+  const rawResults = [...arcgisResults, ...photonResults, ...nominatimResults];
   const results: MapSearchResult[] = [];
   const seenKeys = new Set<string>();
 
-  const [photonRes, nominatimRes] = await Promise.allSettled([
-    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=12`),
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&limit=10&addressdetails=1`, {
-      headers: { 'User-Agent': 'Rideon/1.0' },
-    }),
-  ]);
-
-  // Parse Photon (Komoot ElasticSearch Engine - highly updated POIs, landmarks, malls, metro stations)
-  if (photonRes.status === 'fulfilled' && photonRes.value.ok) {
-    try {
-      const data = await photonRes.value.json();
-      if (data.features) {
-        data.features.forEach((feature: any) => {
-          const props = feature.properties || {};
-          const coords = feature.geometry?.coordinates; // [lng, lat]
-          if (coords && coords.length >= 2) {
-            const lng = coords[0];
-            const lat = coords[1];
-
-            const title = props.name || props.street || props.housenumber || props.district || 'Location';
-            const subtitleParts = [
-              props.street && props.name !== props.street ? props.street : null,
-              props.district || props.suburb || props.neighbourhood,
-              props.city || props.town || props.county,
-              props.state,
-            ].filter(Boolean);
-
-            const subtitle = subtitleParts.join(', ') || props.country || 'Location';
-            const display_name = [title, subtitle].filter(Boolean).join(', ');
-
-            const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              results.push({ title, subtitle, display_name, lat, lng });
-            }
-          }
-        });
+  for (const item of rawResults) {
+    const key = `${item.lat.toFixed(3)}_${item.lng.toFixed(3)}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      if (userCoords) {
+        item.distanceKm = calculateHaversineDistance(userCoords[0], userCoords[1], item.lat, item.lng);
       }
-    } catch (e) {
-      console.warn('Photon parse error:', e);
+      results.push(item);
     }
   }
 
-  // Parse Nominatim (OSM Street Engine)
-  if (nominatimRes.status === 'fulfilled' && nominatimRes.value.ok) {
-    try {
-      const data = await nominatimRes.value.json();
-      data.forEach((item: any) => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lon);
-        const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
-
-        if (!seenKeys.has(key)) {
-          seenKeys.add(key);
-          const parts = (item.display_name || '').split(',');
-          const title = parts[0]?.trim() || item.name || 'Location';
-          const subtitle = parts.slice(1, 4).join(',').trim() || item.display_name;
-          results.push({ title, subtitle, display_name: item.display_name, lat, lng });
-        }
-      });
-    } catch (e) {
-      console.warn('Nominatim parse error:', e);
-    }
+  // Sort by distance if user coordinates available
+  if (userCoords && results.length > 1) {
+    results.sort((a, b) => {
+      const distA = a.distanceKm ?? 99999;
+      const distB = b.distanceKm ?? 99999;
+      return distA - distB;
+    });
   }
 
   return results;
@@ -160,7 +244,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
       `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`
     );
     if (photonRes.ok) {
-      const pData = await photonRes.ok ? await photonRes.json() : null;
+      const pData = await photonRes.json();
       if (pData?.features && pData.features.length > 0) {
         const props = pData.features[0].properties || {};
         const name = props.name || props.street || '';
@@ -179,7 +263,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Rideon/1.0' },
+      headers: { 'User-Agent': 'RIDEON/2.0' },
     });
 
     if (!res.ok) throw new Error('Reverse geocoding error');
@@ -253,11 +337,12 @@ export async function getDirectionsRoute(
 }
 
 export const MAP_CONFIG = {
-  lightTileUrl: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-  darkTileUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-  tileUrl: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  lightTileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  darkTileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   subdomains: ['a', 'b', 'c'],
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/">HOT</a>',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   defaultCenter: [28.6139, 77.209] as [number, number], // New Delhi / NCR default
   defaultZoom: 15,
 };
+

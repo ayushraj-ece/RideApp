@@ -303,18 +303,18 @@ export default function MapView({
       delete markersRef.current['customer'];
     }
 
-    // 2. Pickup Location Marker (Sleek Emerald Teardrop)
+    // 2. Pickup Location Marker (Minimal Emerald Teardrop)
     if (pickupLocation && typeof pickupLocation[0] === 'number' && typeof pickupLocation[1] === 'number' && !isNaN(pickupLocation[0]) && !isNaN(pickupLocation[1])) {
       const icon = L.divIcon({
-        html: `<div style="display:flex; flex-direction:column; align-items:center; width:70px; height:36px; pointer-events:none;">
-            <div style="background:linear-gradient(135deg, #059669, #10b981); color:#ffffff; font-weight:900; font-size:10px; padding:3px 9px; border-radius:12px; border:1.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.35); text-transform:uppercase; letter-spacing:0.8px;">
+        html: `<div style="display:flex; flex-direction:column; align-items:center; width:58px; height:28px; pointer-events:none;">
+            <div style="background:#059669; color:#ffffff; font-weight:800; font-size:9px; padding:2px 7px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.25); text-transform:uppercase; letter-spacing:0.4px;">
               <span>PICKUP</span>
             </div>
-            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #059669; margin-top:-1px;"></div>
+            <div style="width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #059669; margin-top:-1px;"></div>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [70, 36],
-        iconAnchor: [35, 36],
+        iconSize: [58, 28],
+        iconAnchor: [29, 28],
       });
 
       if (!markersRef.current['pickup']) {
@@ -327,18 +327,18 @@ export default function MapView({
       delete markersRef.current['pickup'];
     }
 
-    // 3. Destination Location Marker (Sleek Rose Teardrop)
+    // 3. Destination Location Marker (Minimal Rose Teardrop)
     if (destinationLocation && typeof destinationLocation[0] === 'number' && typeof destinationLocation[1] === 'number' && !isNaN(destinationLocation[0]) && !isNaN(destinationLocation[1])) {
       const icon = L.divIcon({
-        html: `<div style="display:flex; flex-direction:column; align-items:center; width:70px; height:36px; pointer-events:none;">
-            <div style="background:linear-gradient(135deg, #e11d48, #f43f5e); color:#ffffff; font-weight:900; font-size:10px; padding:3px 9px; border-radius:12px; border:1.5px solid #ffffff; box-shadow:0 4px 14px rgba(0,0,0,0.35); text-transform:uppercase; letter-spacing:0.8px;">
+        html: `<div style="display:flex; flex-direction:column; align-items:center; width:50px; height:28px; pointer-events:none;">
+            <div style="background:#e11d48; color:#ffffff; font-weight:800; font-size:9px; padding:2px 7px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.25); text-transform:uppercase; letter-spacing:0.4px;">
               <span>DROP</span>
             </div>
-            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #e11d48; margin-top:-1px;"></div>
+            <div style="width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #e11d48; margin-top:-1px;"></div>
           </div>`,
         className: 'custom-map-icon',
-        iconSize: [70, 36],
-        iconAnchor: [35, 36],
+        iconSize: [50, 28],
+        iconAnchor: [25, 28],
       });
 
       if (!markersRef.current['destination']) {

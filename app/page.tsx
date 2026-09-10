@@ -17,14 +17,12 @@ export default function LandingPage() {
   if (showSplash) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center text-slate-900 font-sans z-50 transition-opacity duration-300">
-        <div className="flex items-center gap-0.5 animate-pulse">
-          <span className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900">
-            RIDE
-          </span>
-          <span className="text-4xl sm:text-5xl font-black tracking-tight text-amber-500">
-            ON
-          </span>
-        </div>
+        {/* eslint-disable-next-html-element-for-img */}
+        <img
+          src="/rideon-logo.png"
+          alt="RIDEON Logo"
+          className="h-8 sm:h-10 w-auto object-contain animate-pulse"
+        />
       </div>
     );
   }
@@ -32,15 +30,15 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between items-center p-4 sm:p-6 font-sans selection:bg-amber-400 selection:text-slate-950">
       {/* Top Header Logo & Live Badge */}
-      <header className="w-full max-w-md pt-4 pb-2 flex items-center justify-between">
-        <div className="inline-flex items-center gap-0.5">
-          <span className="text-2xl font-black tracking-tighter text-slate-900">
-            RIDE
-          </span>
-          <span className="text-2xl font-black tracking-tighter text-amber-500">
-            ON
-          </span>
-        </div>
+      <header className="w-full max-w-md pt-2 pb-1 flex items-center justify-between">
+        <Link href="/" className="inline-flex items-center">
+          {/* eslint-disable-next-html-element-for-img */}
+          <img
+            src="/rideon-logo.png"
+            alt="RIDEON Logo"
+            className="h-2.5 sm:h-3 w-auto object-contain"
+          />
+        </Link>
         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-bold border border-emerald-500/20">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>Realtime Live</span>

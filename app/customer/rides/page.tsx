@@ -202,7 +202,7 @@ export default function CustomerRidesPage() {
                       </div>
 
                       {/* Ride Summary Meta Footer */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px]">
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px] gap-2 flex-wrap">
                         <span className="text-slate-500 dark:text-slate-400">
                           Type: <strong className="text-amber-600 dark:text-amber-400 font-extrabold">{ride.vehicle_type} {ride.is_parcel ? '(Parcel)' : ''}</strong>
                         </span>
@@ -210,7 +210,12 @@ export default function CustomerRidesPage() {
                           Distance: <strong className="text-slate-800 dark:text-slate-200">{ride.distance_km} km</strong>
                         </span>
                         <span className="text-slate-500 dark:text-slate-400">
-                          PIN: <strong className="text-slate-800 dark:text-slate-200 tracking-wider">{ride.otp}</strong>
+                          {ride.is_parcel ? 'Pickup PIN:' : 'PIN:'} <strong className="text-slate-800 dark:text-slate-200 tracking-wider">{ride.otp}</strong>
+                          {ride.is_parcel && ride.drop_otp && (
+                            <span className="ml-2 text-emerald-600 dark:text-emerald-400">
+                              Drop PIN: <strong className="tracking-wider">{ride.drop_otp}</strong>
+                            </span>
+                          )}
                         </span>
                       </div>
                     </div>

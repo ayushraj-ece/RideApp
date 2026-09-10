@@ -85,13 +85,13 @@ export default function CustomerLoginPage() {
           <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
         </button>
 
-        <div className="inline-flex items-center gap-0.5 mx-auto -ml-10">
-          <span className="text-2xl font-black tracking-tighter text-slate-900">
-            RIDE
-          </span>
-          <span className="text-2xl font-black tracking-tighter text-amber-500">
-            ON
-          </span>
+        <div className="inline-flex items-center mx-auto -ml-10">
+          {/* eslint-disable-next-html-element-for-img */}
+          <img
+            src="/rideon-logo.png"
+            alt="RIDEON Logo"
+            className="h-3 sm:h-3.5 w-auto object-contain"
+          />
         </div>
       </header>
 

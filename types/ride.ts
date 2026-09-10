@@ -72,6 +72,7 @@ export interface Ride {
   otp: string;
   drop_otp?: string;
   is_parcel?: boolean;
+  pay_at?: 'PICKUP' | 'DROP';
   cancelled_by: string | null;
   cancel_reason: string | null;
   created_at: string;

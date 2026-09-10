@@ -16,6 +16,7 @@ export interface VehicleConfig {
   badge?: string;
   speedKmH: number; // Avg city speed
   etaMinutes: number; // Base ETA for pickup arrival
+  icon: string;
 }
 
 export interface FareBreakdown {
@@ -44,6 +45,7 @@ export const VEHICLE_CONFIGS: Record<VehicleType, VehicleConfig> = {
     badge: 'Fastest',
     speedKmH: 26,
     etaMinutes: 2,
+    icon: '/icons/bike.png',
   },
   AUTO: {
     type: 'AUTO',
@@ -53,6 +55,7 @@ export const VEHICLE_CONFIGS: Record<VehicleType, VehicleConfig> = {
     badge: 'Popular',
     speedKmH: 21,
     etaMinutes: 4,
+    icon: '/icons/auto.png',
   },
   CAB: {
     type: 'CAB',
@@ -62,6 +65,7 @@ export const VEHICLE_CONFIGS: Record<VehicleType, VehicleConfig> = {
     badge: 'Comfort',
     speedKmH: 23,
     etaMinutes: 5,
+    icon: '/icons/cab.png',
   },
 };
 

@@ -558,8 +558,14 @@ export default function CaptainHomePage() {
   const handleCompleteRide = async () => {
     if (!activeRide || !captain) return;
 
-    if (activeRide.is_parcel && activeRide.drop_otp) {
-      if (dropOtpInput.trim() !== activeRide.drop_otp.trim()) {
+    if (activeRide.is_parcel) {
+      const expectedDropOtp = activeRide.drop_otp?.trim() || (activeRide as any).dropOtp?.trim();
+      if (!dropOtpInput || dropOtpInput.trim().length === 0) {
+        setDropOtpError('Drop-off OTP is required to complete parcel drop.');
+        soundEffects.playErrorBeep();
+        return;
+      }
+      if (expectedDropOtp && dropOtpInput.trim() !== expectedDropOtp) {
         setDropOtpError('Invalid Drop-off OTP code.');
         soundEffects.playErrorBeep();
         return;
@@ -959,31 +965,93 @@ export default function CaptainHomePage() {
 
                 {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
                   <div className="space-y-3 pt-1">
-                    {activeRide.is_parcel && activeRide.drop_otp && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            maxLength={4}
-                            placeholder="Enter Drop-off PIN"
-                            value={dropOtpInput}
-                            onChange={(e) => setDropOtpInput(e.target.value)}
-                            className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-bold placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-amber-400 focus:bg-white dark:focus:bg-slate-950 transition-all text-center tracking-wider text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
-                        {dropOtpError && (
-                          <p className="text-xs font-bold text-rose-500 pl-1">
-                            {dropOtpError}
-                          </p>
+                    {activeRide.is_parcel && (
+                      <div className="space-y-2.5">
+                        {/* PAY AT PICKUP vs DROP NOTICE BADGE */}
+                        {activeRide.pay_at === 'PICKUP' ? (
+                          <div className="p-3 rounded-2xl bg-amber-400/15 border border-amber-400/40 text-slate-900 dark:text-slate-100 flex items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-8 w-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-bold text-sm">
+                                ₹
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                                  Collect ₹{activeRide.estimated_fare} at Pickup
+                                </p>
+                                <p className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold">
+                                  Sender must pay before parcel transit starts
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shrink-0">
+                              Pay at Pickup
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-2xl bg-blue-50 dark:bg-slate-900 border border-blue-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 flex items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-8 w-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 font-bold text-sm">
+                                ₹
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                                  Collect ₹{activeRide.estimated_fare} at Drop
+                                </p>
+                                <p className="text-[10px] text-slate-600 dark:text-slate-400 font-semibold">
+                                  Payment to be collected after Drop OTP verification
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500 text-white font-black text-[9px] uppercase tracking-wider shrink-0">
+                              Pay at Drop
+                            </span>
+                          </div>
                         )}
+
+                        {/* DROP OTP VERIFICATION INPUT */}
+                        <div className="space-y-1.5 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                              <Package className="h-4 w-4 text-amber-500" />
+                              <span>Parcel Drop Verification</span>
+                            </span>
+                            <span className="text-[9.5px] font-black text-rose-500 uppercase tracking-wider bg-rose-500/10 px-2 py-0.5 rounded-md">
+                              Drop OTP Required
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              type="text"
+                              maxLength={4}
+                              placeholder="Enter 4-digit Drop OTP"
+                              value={dropOtpInput}
+                              onChange={(e) => {
+                                setDropOtpInput(e.target.value);
+                                setDropOtpError('');
+                              }}
+                              className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-black placeholder:font-sans placeholder:font-normal placeholder:text-xs placeholder:text-slate-400 outline-none focus:border-amber-400 transition-all text-center tracking-widest text-slate-900 dark:text-slate-100 shadow-2xs"
+                            />
+                          </div>
+                          {dropOtpError && (
+                            <p className="text-xs font-bold text-rose-500 pl-1">
+                              {dropOtpError}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
 
                     <button
                       onClick={handleCompleteRide}
-                      className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-transform active:scale-95 shadow-lg"
+                      className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-transform active:scale-95 shadow-lg flex items-center justify-center gap-2"
                     >
-                      COMPLETE RIDE & COLLECT ₹{activeRide.estimated_fare}
+                      <span>
+                        {activeRide.is_parcel
+                          ? activeRide.pay_at === 'PICKUP'
+                            ? 'COMPLETE PARCEL DROP (Paid at Pickup)'
+                            : `COMPLETE PARCEL DROP & COLLECT ₹${activeRide.estimated_fare}`
+                          : `COMPLETE RIDE & COLLECT ₹${activeRide.estimated_fare}`}
+                      </span>
                     </button>
                   </div>
                 )}
