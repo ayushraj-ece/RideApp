@@ -3,17 +3,39 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-brand-emerald: #143d30;
+  --color-brand-sage: #8fbf7f;
+  --color-brand-pearl: #e2e6e5;
+  --color-brand-dark: #111816;
+}
+
 @layer base {
   html, body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
-    @apply bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200;
+    @apply bg-slate-100 dark:bg-[#111816] text-slate-900 dark:text-slate-100 transition-colors duration-200;
   }
 }
 
-/* Custom Scrollbar for dropdowns and chat */
+/* Brand Utility Classes for Emerald & Sage Palette */
+.bg-brand-emerald { background-color: #143d30; }
+.text-brand-emerald { color: #143d30; }
+.border-brand-emerald { border-color: #143d30; }
+
+.bg-brand-sage { background-color: #8fbf7f; }
+.text-brand-sage { color: #8fbf7f; }
+.border-brand-sage { border-color: #8fbf7f; }
+
+.bg-brand-pearl { background-color: #e2e6e5; }
+.text-brand-pearl { color: #e2e6e5; }
+
+.bg-brand-dark { background-color: #111816; }
+.text-brand-dark { color: #111816; }
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -44,7 +66,7 @@
   background-color: #f4f3f0 !important;
 }
 
-/* Crisp Rapido high-contrast map basemap tiles */
+/* Map basemap tiles */
 .leaflet-tile-pane {
   filter: contrast(1.04) saturate(1.05) brightness(0.98);
 }
@@ -54,7 +76,7 @@
 }
 
 .dark .leaflet-container {
-  background-color: #020617 !important;
+  background-color: #111816 !important;
 }
 
 .leaflet-control-attribution {
@@ -67,28 +89,28 @@
 }
 
 .dark .leaflet-control-attribution {
-  background: rgba(2, 6, 23, 0.75) !important;
+  background: rgba(17, 24, 22, 0.75) !important;
   color: #64748b !important;
 }
 
 .leaflet-control-attribution a {
-  color: #d97706 !important;
+  color: #143d30 !important;
 }
 
 .dark .leaflet-control-attribution a {
-  color: #fbbf24 !important;
+  color: #8fbf7f !important;
 }
 
-/* Clean Minimal Solid Card Utilities (Rapido Minimal Aesthetic - No Blur) */
+/* Clean Minimal Solid Card Utilities */
 .solid-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
 }
 
 .dark .solid-card {
-  background: #0f172a;
-  border: 1px solid #1e293b;
+  background: #16221f;
+  border: 1px solid #233430;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
 }
 
@@ -99,12 +121,12 @@
 }
 
 .dark .solid-pill {
-  background: #0f172a;
-  border: 1px solid #1e293b;
+  background: #16221f;
+  border: 1px solid #233430;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* Rapido Pickup PIN Digit Box Styling */
+/* Pickup PIN Digit Box Styling */
 .pin-digit-box {
   display: inline-flex;
   align-items: center;
@@ -116,13 +138,13 @@
   border: 1px solid #cbd5e1;
   font-weight: 900;
   font-size: 13px;
-  color: #0f172a;
+  color: #143d30;
 }
 
 .dark .pin-digit-box {
-  background: #1e293b;
-  border: 1px solid #334155;
-  color: #f8fafc;
+  background: #1d2c27;
+  border: 1px solid #2d433c;
+  color: #8fbf7f;
 }
 
 /* Pulse animation for radar search */
@@ -141,8 +163,9 @@
   animation: pulseSubtle 2s infinite ease-in-out;
 }
 
-/* Smooth Leaflet marker movement animation for real-time live location tracking */
+/* Leaflet marker animation */
 .leaflet-marker-icon {
   transition: transform 0.4s linear !important;
 }
+
 

@@ -75,21 +75,21 @@ export default function CustomerLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col justify-between items-center p-4 sm:p-6 font-sans selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-screen bg-[#f4f6f5] text-[#111816] flex flex-col justify-between items-center p-4 sm:p-6 font-sans selection:bg-[#8fbf7f] selection:text-[#143d30]">
       {/* Header Bar */}
       <header className="w-full max-w-md pt-4 pb-2 flex items-center justify-between relative">
         <button
           onClick={() => router.push('/')}
-          className="h-9 w-9 rounded-full bg-white shadow-xs hover:bg-slate-50 flex items-center justify-center text-slate-800 transition-colors"
+          className="h-9 w-9 rounded-full bg-white shadow-xs hover:bg-slate-50 flex items-center justify-center text-[#111816] transition-colors"
         >
           <ArrowLeft className="h-4 w-4 stroke-[2.5]" />
         </button>
 
         <div className="inline-flex items-center gap-0.5 mx-auto -ml-9">
-          <span className="text-xl font-bold tracking-tight text-slate-900">
+          <span className="text-xl font-bold tracking-tight text-[#111816]">
             RIDE
           </span>
-          <span className="text-xl font-bold tracking-tight text-amber-500">
+          <span className="text-xl font-bold tracking-tight text-[#143d30]">
             ON
           </span>
         </div>
@@ -98,10 +98,10 @@ export default function CustomerLoginPage() {
       {/* Main Borderless Container Card */}
       <main className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-sm my-auto space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold text-[#111816] tracking-tight">
             {mode === 'LOGIN' ? 'Welcome to RIDEON login now!' : 'Create an Account'}
           </h1>
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">
+          <p className="text-xs font-semibold text-[#143d30] uppercase tracking-wider">
             Customer / Rider Portal
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function CustomerLoginPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Michael Brooks"
-                  className="w-full bg-slate-100/70 border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-amber-400 transition-all outline-none"
+                  className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
                 />
               </div>
             </div>
@@ -140,7 +140,7 @@ export default function CustomerLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="mica.brooks@gmail.com"
-                className="w-full bg-slate-100/70 border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-amber-400 transition-all outline-none"
+                className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
               />
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function CustomerLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-100/70 border-0 rounded-2xl pl-10 pr-10 py-3 text-xs font-semibold text-slate-900 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-amber-400 transition-all outline-none"
+                className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-10 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
               />
               <button
                 type="button"
@@ -176,7 +176,7 @@ export default function CustomerLoginPage() {
               className="flex items-center gap-1.5 text-slate-600 font-medium select-none"
             >
               {rememberMe ? (
-                <CheckSquare className="h-4 w-4 text-amber-500" />
+                <CheckSquare className="h-4 w-4 text-[#143d30]" />
               ) : (
                 <Square className="h-4 w-4 text-slate-300" />
               )}
@@ -194,12 +194,12 @@ export default function CustomerLoginPage() {
             )}
           </div>
 
-          {/* Full-Width Bright Yellow Button */}
+          {/* Full-Width Forest Emerald Button */}
           <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-6 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all disabled:opacity-50 active:scale-[0.98]"
+              className="w-full py-3.5 px-6 rounded-full bg-[#143d30] hover:bg-[#194c3c] text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {loading ? 'Processing...' : mode === 'LOGIN' ? 'Login' : 'Sign Up'}
             </button>
@@ -214,7 +214,7 @@ export default function CustomerLoginPage() {
               <button
                 type="button"
                 onClick={() => { setMode('REGISTER'); setError(''); }}
-                className="font-bold text-slate-900 hover:underline"
+                className="font-bold text-[#143d30] hover:underline"
               >
                 Create an account
               </button>
@@ -225,7 +225,7 @@ export default function CustomerLoginPage() {
               <button
                 type="button"
                 onClick={() => { setMode('LOGIN'); setError(''); }}
-                className="font-bold text-slate-900 hover:underline"
+                className="font-bold text-[#143d30] hover:underline"
               >
                 Login
               </button>
@@ -236,13 +236,14 @@ export default function CustomerLoginPage() {
 
       {/* Switch Portal Footer */}
       <footer className="py-3 text-center text-xs font-semibold text-slate-400">
-        <Link href="/captain/login" className="hover:text-slate-700">
+        <Link href="/captain/login" className="hover:text-[#143d30]">
           Are you a Captain? Switch to Captain Login →
         </Link>
       </footer>
     </div>
   );
 }
+
 
 
 
