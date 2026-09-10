@@ -667,6 +667,8 @@ export default function CustomerHomePage() {
         drop_otp: dropOtpCode,
         is_parcel: isParcelOrder,
         pay_at: isParcelOrder ? parcelPayAt : undefined,
+        receiver_name: isParcelOrder ? (receiverName.trim() || 'Recipient at Drop') : undefined,
+        receiver_phone: isParcelOrder ? (receiverPhone.trim() || '9876543210') : undefined,
       };
 
       let { data: ride, error } = await supabase
@@ -676,17 +678,20 @@ export default function CustomerHomePage() {
         .single();
 
       if (error) {
-        // Fallback gracefully if database table is missing optional parcel/pay_at columns
+        // Fallback gracefully if database table is missing optional parcel/pay_at/receiver columns
         if (
           error.message?.includes('pay_at') ||
           error.message?.includes('is_parcel') ||
           error.message?.includes('drop_otp') ||
+          error.message?.includes('receiver') ||
           error.message?.includes('column') ||
           error.message?.includes('schema cache')
         ) {
           delete payload.pay_at;
           delete payload.is_parcel;
           delete payload.drop_otp;
+          delete payload.receiver_name;
+          delete payload.receiver_phone;
 
           const retryRes = await supabase
             .from('rides')
