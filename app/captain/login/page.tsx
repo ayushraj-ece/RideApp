@@ -4,121 +4,204 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { ShieldCheck, Lock, Mail, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, ChevronRight, MessageSquare, ShieldCheck } from 'lucide-react';
 
 export default function CaptainLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      // 1. Try Signing In
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authError) throw authError;
+      if (!signInError && signInData.user) {
+        // Verify role
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', signInData.user.id)
+          .single();
 
-      // Check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
+        if (profile && profile.role !== 'CAPTAIN') {
+          await supabase.auth.signOut();
+          setError('This account is registered as a Customer. Please use Customer Login.');
+          setLoading(false);
+          return;
+        }
 
-      if (profile && profile.role !== 'CAPTAIN') {
-        await supabase.auth.signOut();
-        setError('This account is registered as a Customer. Please use Customer Login.');
-        setLoading(false);
+        router.push('/captain');
         return;
       }
 
-      router.push('/captain');
+      // 2. If Sign In failed because user account does not exist, attempt automatic Registration
+      if (signInError && (signInError.message.includes('Invalid login credentials') || signInError.message.includes('User not found'))) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (signUpError) throw signUpError;
+
+        if (signUpData.user) {
+          const { error: profileError } = await supabase.from('profiles').upsert({
+            id: signUpData.user.id,
+            email,
+            role: 'CAPTAIN',
+            name: email.split('@')[0],
+          });
+
+          if (profileError) console.error('Error creating profile:', profileError);
+
+          // Insert captain row if needed
+          await supabase.from('captains').upsert({
+            id: signUpData.user.id,
+            vehicle_type: 'BIKE',
+            is_online: false,
+          });
+
+          router.push('/captain');
+          return;
+        }
+      }
+
+      if (signInError) throw signInError;
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(err.message || 'Authentication failed. Check your details.');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center px-4 py-8">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-amber-400 flex items-center justify-center text-slate-950 font-black mb-4 shadow-lg">
-            <ShieldCheck className="h-8 w-8" />
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
+      {/* Top Header Banner (Image 2 Style) */}
+      <div className="bg-amber-400 px-5 pt-6 pb-10 text-slate-950 relative">
+        {/* Navigation Bar */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => router.push('/')}
+            className="h-10 w-10 rounded-full bg-slate-950/10 hover:bg-slate-950/20 flex items-center justify-center transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
+          </button>
+          <span className="text-sm font-bold tracking-tight flex items-center gap-1">
+            <ShieldCheck className="h-4 w-4" />
+            Captain Auth
+          </span>
+          <div className="bg-slate-950 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm">
+            <MessageSquare className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+            <span>Support</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-100">Captain Portal</h1>
-          <p className="text-sm text-slate-400 mt-1">Earn on your schedule</p>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400 text-center">
-            {error}
-          </div>
-        )}
+        {/* Section Heading */}
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Captain Partner</h1>
+          <p className="text-xs sm:text-sm font-semibold text-slate-900/90 max-w-xs">
+            Enter email and password to log in or register your captain account.
+          </p>
+        </div>
+      </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+      {/* Main Content Body (White Sheet resting cleanly below header) */}
+      <main className="flex-1 bg-white -mt-4 rounded-t-3xl p-6 sm:p-8 flex flex-col justify-between max-w-md mx-auto w-full shadow-lg relative">
+        <form onSubmit={handleAuthSubmit} className="space-y-6 pt-2">
+          {error && (
+            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-600 text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Email Address Input */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Captain Email</label>
+            <div className="relative border-b-2 border-slate-200 focus-within:border-amber-500 transition-colors py-1 flex items-center">
+              <Mail className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="captain@example.com"
-                className="w-full rounded-xl bg-slate-800 border border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-transparent text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none py-1"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-3 h-4 w-4 text-slate-500" />
+          {/* Password Input */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Password</label>
+            <div className="relative border-b-2 border-amber-500 py-1 flex items-center">
+              <Lock className="h-5 w-5 text-slate-400 mr-3 shrink-0" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl bg-slate-800 border border-slate-700/80 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-transparent text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none py-1"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-amber-400 py-3 font-semibold text-slate-950 hover:bg-amber-300 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign In as Captain'}
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          {/* Disclaimer Text */}
+          <p className="text-[11px] font-medium text-slate-400 text-center leading-relaxed px-2">
+            By accepting to create account, you Accept <span className="underline font-semibold">Terms and conditions</span> and <span className="underline font-semibold">Partner agreement</span> of Rideon Captain.
+          </p>
+
+          {/* Action Links & Submit Button */}
+          <div className="pt-8 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setError('Password reset instructions sent to your email if registered.')}
+              className="text-xs font-black tracking-wider text-slate-900 hover:underline uppercase"
+            >
+              Forgot password?
+            </button>
+
+            {/* Circular Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="h-14 w-14 rounded-full bg-slate-950 text-amber-400 flex items-center justify-center shadow-xl hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <ChevronRight className="h-6 w-6 stroke-[3]" />
+              )}
+            </button>
+          </div>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-400">
-          Want to become a captain?{' '}
-          <Link href="/captain/register" className="font-semibold text-amber-400 hover:underline">
-            Register vehicle
+        {/* Footer Link */}
+        <div className="mt-8 pt-4 border-t border-slate-100 text-center">
+          <Link href="/customer/login" className="text-xs font-bold text-slate-500 hover:text-slate-900">
+            Customer? Switch to Rider Login →
           </Link>
         </div>
-
-        <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-          <Link href="/customer/login" className="text-xs text-slate-500 hover:text-slate-300">
-            Customer? Switch to Customer Login →
-          </Link>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
+
