@@ -29,7 +29,7 @@ export default function CustomerBottomNav({ activeTab, onTabSelect }: CustomerBo
   };
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 w-full border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md px-6 py-2.5 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-2xl">
+    <div className="fixed bottom-0 inset-x-0 z-50 w-full border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-6 py-2.5 flex items-center justify-around text-slate-500 dark:text-slate-400 shadow-2xl">
       <button
         onClick={() => handleSelect('RIDE')}
         className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-all ${

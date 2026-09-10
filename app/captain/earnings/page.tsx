@@ -7,6 +7,8 @@ import { UserProfile, CaptainEarnings } from '@/types/ride';
 import { DollarSign, TrendingUp, Calendar, ArrowLeft, Loader2, Award } from 'lucide-react';
 import Link from 'next/link';
 
+import CaptainBottomNav from '@/components/ui/CaptainBottomNav';
+
 export default function CaptainEarningsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [earnings, setEarnings] = useState<CaptainEarnings[]>([]);
@@ -45,7 +47,7 @@ export default function CaptainEarningsPage() {
     .reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 font-sans">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 font-sans pb-16">
       <Navbar
         role="CAPTAIN"
         userName={profile?.name}
@@ -117,6 +119,7 @@ export default function CaptainEarningsPage() {
           )}
         </div>
       </main>
+      <CaptainBottomNav activeTab="EARNINGS" />
     </div>
   );
 }

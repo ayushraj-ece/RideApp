@@ -122,8 +122,13 @@ export default function MapView({
       doubleClickZoom: true,
     });
 
-    L.tileLayer(MAP_CONFIG.tileUrl, {
-      maxZoom: 19,
+    const isDarkMode = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+    const activeTileUrl = isDarkMode ? MAP_CONFIG.darkTileUrl : MAP_CONFIG.lightTileUrl;
+
+    L.tileLayer(activeTileUrl, {
+      maxZoom: 20,
+      subdomains: MAP_CONFIG.subdomains,
+      attribution: MAP_CONFIG.attribution,
     }).addTo(map);
 
     // Map click handler

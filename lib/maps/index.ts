@@ -41,55 +41,145 @@ export function calculateHaversineDistance(
 }
 
 /**
- * Free geocoding search using OpenStreetMap / Nominatim API
+ * Multi-Engine High-Accuracy Geocoding Search (Photon + Nominatim + Google Places)
+ * Returns up-to-date local places, shops, apartments, metro stations, airports, tech parks & landmarks
  */
 export async function searchGeocode(query: string): Promise<MapSearchResult[]> {
   if (!query || query.trim().length < 2) return [];
 
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      query
-    )}&limit=10&addressdetails=1`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Rideon/1.0',
-      },
-    });
+  const cleanQuery = query.trim();
+  const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-    if (!res.ok) throw new Error('Geocoding API error');
-    const data = await res.json();
-
-    const apiResults: MapSearchResult[] = data.map((item: any) => {
-      const parts = (item.display_name || '').split(',');
-      const title = parts[0]?.trim() || item.name || 'Location';
-      const subtitle = parts.slice(1, 4).join(',').trim() || item.display_name;
-
-      return {
-        title,
-        subtitle,
-        display_name: item.display_name,
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-      };
-    });
-
-    return apiResults;
-  } catch (error) {
-    console.warn('Geocoding search error:', error);
-    return [];
+  // 1. Google Maps Geocoding API if API key is provided
+  if (googleApiKey) {
+    try {
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        cleanQuery
+      )}&key=${googleApiKey}`;
+      const gRes = await fetch(googleUrl);
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (gData.results && gData.results.length > 0) {
+          return gData.results.map((item: any) => {
+            const parts = item.formatted_address.split(',');
+            const title = parts[0]?.trim() || item.formatted_address;
+            const subtitle = parts.slice(1, 4).join(',').trim() || item.formatted_address;
+            return {
+              title,
+              subtitle,
+              display_name: item.formatted_address,
+              lat: item.geometry.location.lat,
+              lng: item.geometry.location.lng,
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Google Places API search failed, falling back to multi-engine:', e);
+    }
   }
+
+  // 2. Parallel Multi-Engine Search (Photon + Nominatim) for instant, up-to-date place search
+  const results: MapSearchResult[] = [];
+  const seenKeys = new Set<string>();
+
+  const [photonRes, nominatimRes] = await Promise.allSettled([
+    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&limit=12`),
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&limit=10&addressdetails=1`, {
+      headers: { 'User-Agent': 'Rideon/1.0' },
+    }),
+  ]);
+
+  // Parse Photon (Komoot ElasticSearch Engine - highly updated POIs, landmarks, malls, metro stations)
+  if (photonRes.status === 'fulfilled' && photonRes.value.ok) {
+    try {
+      const data = await photonRes.value.json();
+      if (data.features) {
+        data.features.forEach((feature: any) => {
+          const props = feature.properties || {};
+          const coords = feature.geometry?.coordinates; // [lng, lat]
+          if (coords && coords.length >= 2) {
+            const lng = coords[0];
+            const lat = coords[1];
+
+            const title = props.name || props.street || props.housenumber || props.district || 'Location';
+            const subtitleParts = [
+              props.street && props.name !== props.street ? props.street : null,
+              props.district || props.suburb || props.neighbourhood,
+              props.city || props.town || props.county,
+              props.state,
+            ].filter(Boolean);
+
+            const subtitle = subtitleParts.join(', ') || props.country || 'Location';
+            const display_name = [title, subtitle].filter(Boolean).join(', ');
+
+            const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              results.push({ title, subtitle, display_name, lat, lng });
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Photon parse error:', e);
+    }
+  }
+
+  // Parse Nominatim (OSM Street Engine)
+  if (nominatimRes.status === 'fulfilled' && nominatimRes.value.ok) {
+    try {
+      const data = await nominatimRes.value.json();
+      data.forEach((item: any) => {
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const parts = (item.display_name || '').split(',');
+          const title = parts[0]?.trim() || item.name || 'Location';
+          const subtitle = parts.slice(1, 4).join(',').trim() || item.display_name;
+          results.push({ title, subtitle, display_name: item.display_name, lat, lng });
+        }
+      });
+    } catch (e) {
+      console.warn('Nominatim parse error:', e);
+    }
+  }
+
+  return results;
 }
 
 /**
- * High-accuracy reverse geocoding lat/lng to display address using Nominatim
+ * High-accuracy reverse geocoding lat/lng to display address using Photon + Nominatim
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
+    const photonRes = await fetch(
+      `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`
+    );
+    if (photonRes.ok) {
+      const pData = await photonRes.ok ? await photonRes.json() : null;
+      if (pData?.features && pData.features.length > 0) {
+        const props = pData.features[0].properties || {};
+        const name = props.name || props.street || '';
+        const area = props.district || props.suburb || props.neighbourhood || '';
+        const city = props.city || props.town || props.state || '';
+        const parts = [name, area, city].filter(Boolean);
+        if (parts.length >= 2) {
+          return parts.join(', ');
+        }
+      }
+    }
+  } catch (e) {
+    // Fall back to Nominatim
+  }
+
+  try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`;
     const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Rideon/1.0',
-      },
+      headers: { 'User-Agent': 'Rideon/1.0' },
     });
 
     if (!res.ok) throw new Error('Reverse geocoding error');
@@ -163,9 +253,11 @@ export async function getDirectionsRoute(
 }
 
 export const MAP_CONFIG = {
-  tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  lightTileUrl: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  darkTileUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  tileUrl: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  subdomains: ['a', 'b', 'c'],
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/">HOT</a>',
   defaultCenter: [28.6139, 77.209] as [number, number], // New Delhi / NCR default
-  defaultZoom: 14,
+  defaultZoom: 15,
 };

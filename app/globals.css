@@ -41,7 +41,16 @@
 
 .leaflet-container {
   font-family: inherit !important;
-  background-color: #f1f5f9 !important;
+  background-color: #f4f3f0 !important;
+}
+
+/* Crisp Rapido high-contrast map basemap tiles */
+.leaflet-tile-pane {
+  filter: contrast(1.04) saturate(1.05) brightness(0.98);
+}
+
+.dark .leaflet-tile-pane {
+  filter: grayscale(0.7) brightness(0.85) contrast(1.1);
 }
 
 .dark .leaflet-container {
@@ -68,6 +77,52 @@
 
 .dark .leaflet-control-attribution a {
   color: #fbbf24 !important;
+}
+
+/* Clean Minimal Solid Card Utilities (Rapido Minimal Aesthetic - No Blur) */
+.solid-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+}
+
+.dark .solid-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+.solid-pill {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dark .solid-pill {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Rapido Pickup PIN Digit Box Styling */
+.pin-digit-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  font-weight: 900;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.dark .pin-digit-box {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #f8fafc;
 }
 
 /* Pulse animation for radar search */

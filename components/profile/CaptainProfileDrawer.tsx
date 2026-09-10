@@ -119,7 +119,7 @@ export default function CaptainProfileDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-40 pb-14 flex justify-end bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 h-full p-6 shadow-2xl flex flex-col justify-between overflow-y-auto border-l border-slate-200 dark:border-slate-800">
         <div className="space-y-6">
           {/* HEADER */}

@@ -61,6 +61,7 @@ import {
   Briefcase,
   User,
   Box,
+  Phone,
 } from 'lucide-react';
 
 export default function CustomerHomePage() {
@@ -150,12 +151,14 @@ export default function CustomerHomePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isSafetyOpen, setIsSafetyOpen] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [dismissedRatingRideId, setDismissedRatingRideId] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isParcelModalOpen, setIsParcelModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isTripDetailsOpen, setIsTripDetailsOpen] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'RIDE' | 'PARCEL' | 'PROFILE'>('RIDE');
   const [isCustomerSheetCollapsed, setIsCustomerSheetCollapsed] = useState(false);
+  const [isBookingSheetCollapsed, setIsBookingSheetCollapsed] = useState(false);
 
 
   // 1. Authenticate user & check active ride
@@ -643,6 +646,8 @@ export default function CustomerHomePage() {
       };
 
       setActiveRide(activeRideObj);
+      setIsCustomerSheetCollapsed(false);
+      setIsBookingSheetCollapsed(false);
       setSearchTimeout(45);
     } catch (err: any) {
       alert(err.message || 'Failed to create ride request');
@@ -688,7 +693,7 @@ export default function CustomerHomePage() {
             soundEffects.playAcceptedChime();
           }
 
-          if (updatedRide.status === 'COMPLETED') {
+          if (updatedRide.status === 'COMPLETED' && dismissedRatingRideId !== updatedRide.id) {
             setShowRatingModal(true);
           }
         }
@@ -710,7 +715,7 @@ export default function CustomerHomePage() {
           soundEffects.playAcceptedChime();
         }
 
-        if (updatedRide.status === 'COMPLETED') {
+        if (updatedRide.status === 'COMPLETED' && dismissedRatingRideId !== updatedRide.id) {
           setShowRatingModal(true);
         }
       }
@@ -720,7 +725,7 @@ export default function CustomerHomePage() {
       supabase.removeChannel(channel);
       clearInterval(pollInterval);
     };
-  }, [activeRide?.id]);
+  }, [activeRide?.id, dismissedRatingRideId]);
 
   useEffect(() => {
     if (!activeRide?.captain_id || !['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'IN_PROGRESS'].includes(activeRide.status)) {
@@ -814,8 +819,25 @@ export default function CustomerHomePage() {
     }
   };
 
+  const handleCloseRatingModal = () => {
+    if (activeRide?.id) {
+      setDismissedRatingRideId(activeRide.id);
+    }
+    setShowRatingModal(false);
+    setActiveRide(null);
+    setAssignedCaptain(null);
+    setDestinationCoords(null);
+    setDestinationAddress('');
+    setDestinationQuery('');
+    setRouteCoords([]);
+  };
+
   const handleRatingSubmit = async (rating: number, feedback: string) => {
     if (!activeRide || !user || !assignedCaptain) return;
+
+    if (activeRide.id) {
+      setDismissedRatingRideId(activeRide.id);
+    }
 
     // 1. Record rating entry
     await supabase.from('ratings').insert({
@@ -867,6 +889,76 @@ export default function CustomerHomePage() {
   const currentFareBreakdown: FareBreakdown | null = (pickupCoords && destinationCoords)
     ? getFareBreakdown(distanceKm, selectedVehicle)
     : null;
+
+  const getCaptainEtaDetails = () => {
+    if (!activeRide) return { hasLiveLocation: false, text: 'Captain Assigned', miniText: 'Assigned' };
+
+    const captPos: [number, number] | null = captainLiveLocation ||
+      (assignedCaptain?.latitude && assignedCaptain?.longitude
+        ? [assignedCaptain.latitude, assignedCaptain.longitude]
+        : null);
+
+    let targetLat = activeRide.pickup_latitude;
+    let targetLng = activeRide.pickup_longitude;
+
+    if (['IN_PROGRESS', 'OTP_VERIFIED'].includes(activeRide.status)) {
+      targetLat = activeRide.destination_latitude;
+      targetLng = activeRide.destination_longitude;
+    }
+
+    if (activeRide.status === 'CAPTAIN_ARRIVED') {
+      return {
+        hasLiveLocation: true,
+        text: 'Captain Arrived at Pickup',
+        miniText: 'Arrived at Pickup'
+      };
+    }
+
+    if (!captPos || !targetLat || !targetLng) {
+      return {
+        hasLiveLocation: false,
+        text: activeRide.status === 'ACCEPTED' ? 'Captain Assigned' : 'Captain En Route',
+        miniText: activeRide.status === 'ACCEPTED' ? 'Assigned' : 'En Route'
+      };
+    }
+
+    const distKm = calculateHaversineDistance(captPos, [targetLat, targetLng]);
+    const etaMins = Math.max(1, Math.round((distKm / 22) * 60));
+    const formattedDist = distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`;
+
+    if (distKm < 0.05) {
+      return {
+        hasLiveLocation: true,
+        distKm: distKm.toFixed(1),
+        formattedDist,
+        etaMins: 0,
+        text: 'Captain Arrived at Pickup',
+        miniText: 'Arrived at Pickup'
+      };
+    }
+
+    if (['IN_PROGRESS', 'OTP_VERIFIED'].includes(activeRide.status)) {
+      return {
+        hasLiveLocation: true,
+        distKm: distKm.toFixed(1),
+        formattedDist,
+        etaMins,
+        text: `On the way to Drop-off (${formattedDist} • ${etaMins} mins)`,
+        miniText: `En Route • ${etaMins}m`
+      };
+    }
+
+    return {
+      hasLiveLocation: true,
+      distKm: distKm.toFixed(1),
+      formattedDist,
+      etaMins,
+      text: `Arriving in ${etaMins} mins (${formattedDist} away)`,
+      miniText: `Arriving in ${etaMins}m • ${formattedDist}`
+    };
+  };
+
+  const currentCaptainEta = getCaptainEtaDetails();
 
   return (
     <div className="relative h-screen w-full bg-slate-100 dark:bg-slate-950 flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
@@ -1129,367 +1221,389 @@ export default function CustomerHomePage() {
           <div className={`fixed inset-x-0 z-30 max-w-lg mx-auto w-full pointer-events-auto ${activeRide ? 'bottom-0' : 'bottom-[56px] sm:bottom-16'}`}>
             {/* CASE A: SEARCHING FOR CAPTAIN */}
             {activeRide?.status === 'SEARCHING' && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl text-center space-y-4 max-h-[82vh] overflow-y-auto overscroll-contain">
-                <div className="relative mx-auto flex h-14 w-14 items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-70"></span>
-                  <div className="relative h-11 w-11 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-950 font-bold shadow-lg">
-                    <Bike className="h-6 w-6" />
+              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl text-center space-y-4 max-h-[82vh] overflow-y-auto overscroll-contain">
+                {/* ANIMATED RADAR VEHICLE ICON */}
+                <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400/40 opacity-75" />
+                  <span className="animate-pulse absolute inline-flex h-12 w-12 rounded-full bg-amber-400/20" />
+                  <div className="relative h-12 w-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-md">
+                    {activeRide.vehicle_type === 'AUTO' ? (
+                      <Car className="h-6 w-6 stroke-[2.5]" />
+                    ) : activeRide.vehicle_type?.includes('CAB') ? (
+                      <Car className="h-6 w-6 stroke-[2.5]" />
+                    ) : activeRide.is_parcel ? (
+                      <Package className="h-6 w-6 stroke-[2.5]" />
+                    ) : (
+                      <Bike className="h-6 w-6 stroke-[2.5]" />
+                    )}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">Finding nearby captain...</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Requesting nearest {activeRide.vehicle_type} ({searchTimeout}s timeout)
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-slate-50 dark:bg-slate-900/60 p-3.5 text-xs text-left border border-slate-200 dark:border-slate-800/60 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium">Vehicle Option</span>
-                    <span className="font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 text-[11px]">
+                {/* TITLE & LIVE RADAR STATUS */}
+                <div className="space-y-1">
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Connecting with nearby Captains...
+                  </h3>
+                  <div className="flex items-center justify-center gap-2 pt-0.5">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                       {activeRide.vehicle_type}
                     </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium">Estimated Fare</span>
-                    <span className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">₹{activeRide.estimated_fare}</span>
-                  </div>
-                  <div className="truncate text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-800/60 flex items-center gap-1.5 text-[11px]">
-                    <Navigation className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                    <span className="truncate">{activeRide.destination_address}</span>
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-slate-400" />
+                      <span>{searchTimeout}s timeout</span>
+                    </span>
                   </div>
                 </div>
 
+                {/* MODERN COMPLETE ROUTE & FARE CARD */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-left space-y-3 shadow-sm">
+                  {/* TIMELINE ROUTE (PICKUP & DESTINATION) */}
+                  <div className="relative pl-5 space-y-3">
+                    {/* Continuous Timeline Connector Line */}
+                    <div className="absolute left-[5px] top-[10px] bottom-[10px] w-0.5 bg-slate-200 dark:bg-slate-700/80 rounded-full" />
+
+                    {/* Pickup Point Node */}
+                    <div className="relative flex items-start justify-between gap-2">
+                      <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Pickup Point</span>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.pickup_address}</p>
+                      </div>
+                    </div>
+
+                    {/* Drop Location Node */}
+                    <div className="relative flex items-start justify-between gap-2">
+                      <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Destination</span>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.destination_address}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FULL-WIDTH FARE ROW DIVIDER */}
+                  <div className="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Fare</span>
+                    <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      ₹{activeRide.estimated_fare}
+                    </span>
+                  </div>
+                </div>
+
+                {/* CANCEL SEARCH BUTTON */}
                 <button
                   onClick={() => setIsCancelModalOpen(true)}
-                  className="w-full rounded-2xl bg-slate-100 dark:bg-slate-900 py-3.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                  className="w-full py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm text-center"
                 >
                   Cancel Search
                 </button>
               </div>
-            )}
-
-            {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
+            )}            {/* CASE B: CAPTAIN ASSIGNED / IN PROGRESS */}
             {activeRide && ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
-              <div className={`rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-5 pb-6 shadow-2xl backdrop-blur-2xl transition-all duration-300 ${
-                isCustomerSheetCollapsed ? 'max-h-[85px] overflow-hidden' : 'max-h-[50vh] overflow-y-auto overscroll-contain space-y-3.5'
+              <div className={`rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl transition-all duration-300 ${
+                isCustomerSheetCollapsed ? 'max-h-[85px] overflow-hidden' : 'max-h-[60vh] overflow-y-auto overscroll-contain space-y-3.5'
               }`}>
                 {/* TOP COLLAPSE / EXPAND HANDLE */}
                 <button
                   onClick={() => setIsCustomerSheetCollapsed(!isCustomerSheetCollapsed)}
-                  className="w-full flex items-center justify-center gap-1.5 pb-2 -mt-1 text-slate-400 hover:text-amber-500 transition-colors"
-                  title={isCustomerSheetCollapsed ? "Expand ride details" : "Minimize panel for full map view"}
+                  className="w-full flex items-center justify-center gap-1.5 pb-2 -mt-1 text-slate-400 hover:text-amber-500 transition-colors group"
+                  title={isCustomerSheetCollapsed ? "Expand ride details" : "Minimize panel for 90% map view"}
                 >
-                  <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
-                  {isCustomerSheetCollapsed ? <ChevronUp className="h-4 w-4 text-amber-500 animate-bounce" /> : <ChevronDown className="h-4 w-4" />}
+                  <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full group-hover:bg-amber-400 transition-colors" />
                 </button>
 
-                {/* COLLAPSED MINI BAR MODE */}
+                {/* COLLAPSED MINI BAR MODE (Minimal height for 90% map visibility) */}
                 {isCustomerSheetCollapsed ? (
-                  <div className="flex items-center justify-between gap-2 cursor-pointer" onClick={() => setIsCustomerSheetCollapsed(false)}>
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        {activeRide.status.replace('_', ' ')}
+                  <div className="flex items-center justify-between gap-3 cursor-pointer py-1" onClick={() => setIsCustomerSheetCollapsed(false)}>
+                    {/* LEFT: REAL-TIME ETA & CAPTAIN INFO */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center gap-1.5 shrink-0 shadow-sm">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>{currentCaptainEta.miniText}</span>
                       </span>
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {assignedCaptain?.profile?.name || 'Captain Assigned'}
-                      </span>
+
+                      {assignedCaptain && (
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                          {assignedCaptain.profile?.name || 'Captain'}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-black text-slate-900 dark:text-slate-100">₹{activeRide.estimated_fare}</span>
-                      <span className="p-1 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold px-2.5 py-0.5">
-                        EXPAND MAP DETAILS
+                    {/* RIGHT: INLINE PIN + FARE + EXPAND TOGGLE */}
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      {!['COMPLETED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+                          <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">PIN</span>
+                          <span className="font-mono font-bold text-xs">
+                            {activeRide.otp || '0000'}
+                          </span>
+                        </div>
+                      )}
+
+                      <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                        ₹{activeRide.estimated_fare}
                       </span>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCustomerSheetCollapsed(false);
+                        }}
+                        className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center shrink-0"
+                        title="Expand details"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 ) : (
                   <>
-                    {/* SIMPLE STATUS & OTP HEADER (PARCEL vs RIDE DISTINCTION) */}
-                    <div className="space-y-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {activeRide.is_parcel ? (
-                            <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1">
+                    {/* TOP STATUS HEADER WITH REALTIME DISTANCE & ETA */}
+                    <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between gap-2">
+                        {/* LEFT: STATUS BADGE WITH REALTIME ETA */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 flex items-center gap-1.5 shrink-0 shadow-sm">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="truncate">{currentCaptainEta.text}</span>
+                          </span>
+
+                          {activeRide.is_parcel && (
+                            <span className="text-xs font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 shrink-0">
                               <Package className="h-3 w-3" />
-                              PARCEL DELIVERY
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                              {activeRide.status.replace('_', ' ')}
+                              Parcel
                             </span>
                           )}
                         </div>
-                        <span className="text-sm font-black text-slate-900 dark:text-slate-100">
-                          ₹{activeRide.estimated_fare}
-                        </span>
+
+                        {/* RIGHT: PIN AND MINIMIZE */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* INLINE CLEAN PIN BADGE */}
+                          {!['COMPLETED', 'OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+                              <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-wider">PIN</span>
+                              <span className="font-mono font-bold text-xs">
+                                {activeRide.otp || '0000'}
+                              </span>
+                            </div>
+                          ) : activeRide.is_parcel && activeRide.drop_otp ? (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+                              <span className="text-[10px] font-extrabold text-emerald-500 uppercase tracking-wider">DROP</span>
+                              <span className="font-mono font-bold text-xs">
+                                {activeRide.drop_otp}
+                              </span>
+                            </div>
+                          ) : null}
+
+                          <button
+                            onClick={() => setIsCustomerSheetCollapsed(true)}
+                            className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-amber-500 transition-colors flex items-center justify-center shrink-0"
+                            title="Minimize sheet for 90% map view"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
+                    </div>
 
-
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
-                      {activeRide.is_parcel ? (
-                        <>
-                          {activeRide.status === 'ACCEPTED' && 'Captain accepted your parcel delivery'}
-                          {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain on the way for package pickup'}
-                          {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain arrived for package pickup'}
-                          {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Parcel in transit to drop location'}
-                        </>
-                      ) : (
-                        <>
-                          {activeRide.status === 'ACCEPTED' && 'Captain accepted your ride'}
-                          {activeRide.status === 'CAPTAIN_ARRIVING' && 'Captain is on the way'}
-                          {activeRide.status === 'CAPTAIN_ARRIVED' && 'Captain has arrived at pickup'}
-                          {['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) && 'Trip in progress'}
-                        </>
-                      )}
-                    </h3>
-
-                    {/* DYNAMIC OTP DISPLAY: RANDOM FOR PARCEL PICKUP/DROP vs PERMANENT FOR RIDES */}
-                    {!['COMPLETED'].includes(activeRide.status) && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status) ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-bold text-slate-400">PICKUP PIN</span>
-                            {(activeRide.otp || '0000').split('').map((digit, idx) => (
-                              <span
-                                key={idx}
-                                className="w-6 h-7 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700"
-                              >
-                                {digit}
-                              </span>
-                            ))}
+                    {/* CAPTAIN PROFILE CARD WITH CALL/CHAT */}
+                    {assignedCaptain && (
+                      <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 truncate">
+                          <div className="h-11 w-11 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-extrabold shadow-sm shrink-0">
+                            {assignedCaptain.vehicle_type === 'BIKE' ? <Bike className="h-6 w-6 stroke-[2.5]" /> : <Car className="h-6 w-6 stroke-[2.5]" />}
                           </div>
-                        ) : activeRide.is_parcel && activeRide.drop_otp ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-bold text-emerald-500">DROP PIN</span>
-                            {(activeRide.drop_otp || '0000').split('').map((digit, idx) => (
-                              <span
-                                key={idx}
-                                className="w-6 h-7 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/30"
-                              >
-                                {digit}
+                          <div className="truncate">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-xs truncate">
+                                {assignedCaptain.profile?.name || 'Captain'}
+                              </h4>
+                              <div className="flex items-center gap-1 text-amber-500 text-xs font-black shrink-0">
+                                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                                <span>{assignedCaptain.rating_count > 0 ? (assignedCaptain.rating_sum / assignedCaptain.rating_count).toFixed(1) : '5.0'}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                                {assignedCaptain.vehicle_number}
                               </span>
-                            ))}
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">{assignedCaptain.vehicle_model}</span>
+                            </div>
                           </div>
-                        ) : null}
+                        </div>
+
+                        {/* CALL & CHAT ACTION BUTTONS */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {assignedCaptain.profile?.phone && (
+                            <a
+                              href={`tel:${assignedCaptain.profile.phone}`}
+                              className="h-9 w-9 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 flex items-center justify-center hover:bg-amber-400 hover:text-slate-950 transition-colors shadow-sm"
+                              title="Call Captain"
+                            >
+                              <Phone className="h-4 w-4" />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => setIsChatOpen(true)}
+                            className="h-9 w-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold hover:bg-amber-300 transition-colors shadow-sm"
+                            title="Chat with Captain"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  {activeRide.is_parcel && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20">
-                      📦 Max Package Weight: <strong>20 kg</strong> (Captain may reject oversized packages)
-                    </p>
-                  )}
+                    {/* ROUTE LOCATION CARD */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative">
+                      <div className="relative pl-5 space-y-3.5">
+                        {/* Timeline vertical connector line */}
+                        <div className="absolute left-[5px] top-[14px] bottom-[14px] w-0.5 bg-slate-200 dark:bg-slate-700/80 rounded-full" />
 
-                  {/* LIVE CAPTAIN DISTANCE & ETA BADGE */}
-                  {(() => {
-                    if (!activeRide) return null;
-
-                    if (['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status)) {
-                      const pickPos = pickupCoords || [activeRide.pickup_lat, activeRide.pickup_lng];
-                      const captLat = captainLiveLocation ? captainLiveLocation[0] : assignedCaptain?.latitude;
-                      const captLng = captainLiveLocation ? captainLiveLocation[1] : assignedCaptain?.longitude;
-
-                      const distKm = (captLat && captLng && pickPos)
-                        ? calculateHaversineDistance(captLat, captLng, pickPos[0], pickPos[1])
-                        : distanceKm;
-                      const etaMins = Math.max(1, Math.ceil((distKm / 25) * 60));
-
-                      return (
-                        <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 mt-2">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-4 w-4 animate-spin text-amber-500" />
-                            <span>
-                              {distKm < 0.1 ? 'Captain has arrived at pickup point' : `Arriving at pickup in ~${etaMins} mins`}
-                            </span>
+                        {/* Pickup Point Node */}
+                        <div className="relative flex items-start justify-between gap-2">
+                          <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Pickup Point</span>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.pickup_address}</p>
                           </div>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-amber-500/20">
-                            {distKm < 0.1 ? 'ARRIVED' : `${distKm} km away`}
+                        </div>
+
+                        {/* Distance Badge */}
+                        <div className="py-0.5">
+                          <span className="text-[10px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                            <span>{activeRide.distance_km} km</span>
+                            <span className="text-[9px] opacity-70">• Est. route</span>
                           </span>
                         </div>
-                      );
-                    } else if (['OTP_VERIFIED', 'IN_PROGRESS'].includes(activeRide.status)) {
-                      const dropPos = destinationCoords || [activeRide.destination_lat, activeRide.destination_lng];
-                      const captLat = captainLiveLocation ? captainLiveLocation[0] : (pickupCoords ? pickupCoords[0] : activeRide.pickup_lat);
-                      const captLng = captainLiveLocation ? captainLiveLocation[1] : (pickupCoords ? pickupCoords[1] : activeRide.pickup_lng);
 
-                      const distKm = (captLat && captLng && dropPos)
-                        ? calculateHaversineDistance(captLat, captLng, dropPos[0], dropPos[1])
-                        : activeRide.distance_km || distanceKm;
-                      const etaMins = Math.max(1, Math.ceil((distKm / 30) * 60));
-
-                      return (
-                        <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-2">
-                          <div className="flex items-center gap-1.5">
-                            <Navigation className="h-4 w-4 animate-pulse text-emerald-500" />
-                            <span>
-                              {distKm < 0.2 ? 'Reaching destination soon' : `On the way to destination (~${etaMins} mins)`}
-                            </span>
+                        {/* Drop Location Node */}
+                        <div className="relative flex items-start justify-between gap-2">
+                          <span className="absolute -left-5 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[9px] font-bold uppercase text-slate-400 dark:text-slate-500 tracking-wider block">Drop Location</span>
+                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.destination_address}</p>
                           </div>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-emerald-500/20">
-                            {distKm < 0.2 ? 'ARRIVING' : `${distKm} km remaining`}
-                          </span>
-                        </div>
-                      );
-                    }
-
-                    return null;
-                  })()}
-
-                </div>
-
-                {/* CAPTAIN & VEHICLE CARD */}
-                {assignedCaptain && (
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-11 w-11 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold shadow-inner shrink-0">
-                        {assignedCaptain.vehicle_type === 'BIKE' ? <Bike className="h-6 w-6" /> : <Car className="h-6 w-6" />}
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-slate-900 dark:text-slate-100 text-xs">{assignedCaptain.profile?.name || 'Captain'}</h4>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[11px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
-                            {assignedCaptain.vehicle_number}
-                          </span>
-                          <span className="text-[11px] text-slate-500 font-medium">{assignedCaptain.vehicle_model}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-amber-500 text-xs font-black justify-end">
-                        <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                        <span>{assignedCaptain.rating_count > 0 ? (assignedCaptain.rating_sum / assignedCaptain.rating_count).toFixed(1) : '5.0'}</span>
-                      </div>
+                    {/* COLLAPSIBLE FARE BREAKDOWN SECTION */}
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
+                      <button
+                        onClick={() => setShowFareBreakdown(!showFareBreakdown)}
+                        className="w-full flex items-center justify-between p-3 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-6 w-6 rounded-lg bg-amber-400/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <Receipt className="h-3.5 w-3.5" />
+                          </div>
+                          <span>Fare Breakdown</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-900 dark:text-slate-100 font-extrabold text-xs">₹{activeRide.estimated_fare}</span>
+                          {showFareBreakdown ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                        </div>
+                      </button>
+
+                      {showFareBreakdown && (
+                        <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-2 text-xs">
+                          {(() => {
+                            const breakdown = getFareBreakdown(activeRide.distance_km || 1, activeRide.vehicle_type || 'BIKE');
+                            return (
+                              <>
+                                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                                  <span>Base Ride Fare</span>
+                                  <span>₹{breakdown.baseFare}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                                  <span>Distance Charge ({activeRide.distance_km} km)</span>
+                                  <span>₹{breakdown.distanceCharge}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                                  <span>Booking & Safety Fee</span>
+                                  <span>₹{breakdown.bookingFee}</span>
+                                </div>
+                                {breakdown.surgeCharge > 0 && (
+                                  <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
+                                    <span>Peak Surge Charge ({breakdown.surgeMultiplier}x)</span>
+                                    <span>+₹{breakdown.surgeCharge}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-800 font-black text-slate-900 dark:text-slate-100">
+                                  <span>Total Amount Payable</span>
+                                  <span className="text-amber-500 text-sm">₹{activeRide.estimated_fare}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
-                  </div>
+
+                    {/* CANCEL RIDE BUTTON */}
+                    <div className="pt-2">
+                      <button
+                        onClick={() => setIsCancelModalOpen(true)}
+                        className="w-full py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm text-center"
+                      >
+                        Cancel Ride
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+
+            {/* CASE C: RAPIDO HOME & BOOKING SELECTION SHEET */}
+            {!activeRide && (
+              <div className={`rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl transition-all duration-300 flex flex-col overflow-hidden shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)] ${
+                isBookingSheetCollapsed && destinationCoords ? 'max-h-[90px]' : 'max-h-[68vh] sm:max-h-[72vh]'
+              }`}>
+                {/* COLLAPSE HANDLE FOR DESTINATION VIEW */}
+                {destinationCoords && (
+                  <button
+                    onClick={() => setIsBookingSheetCollapsed(!isBookingSheetCollapsed)}
+                    className="w-full flex items-center justify-center pb-2 -mt-1 text-slate-400 hover:text-amber-500 transition-colors"
+                    title={isBookingSheetCollapsed ? "Expand vehicle options" : "Collapse panel for 90% map view"}
+                  >
+                    <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+                  </button>
                 )}
 
-                {/* CONNECTED ROUTE SUMMARY CARD (PICKUP -> DESTINATION) */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/80 space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Pickup</span>
-                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.pickup_address}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="ml-1 pl-4 border-l-2 border-dashed border-slate-300 dark:border-slate-700 py-0.5">
-                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{activeRide.distance_km} km distance</span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5">
-                    <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Destination</span>
-                      <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{activeRide.destination_address}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* COLLAPSIBLE / DETAILED FARE BREAKDOWN SECTION */}
-                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/40">
-                  <button
-                    onClick={() => setShowFareBreakdown(!showFareBreakdown)}
-                    className="w-full flex items-center justify-between p-3 text-xs font-extrabold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Receipt className="h-4 w-4 text-amber-500" />
-                      <span>Fare Breakdown</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-900 dark:text-slate-100 font-black">₹{activeRide.estimated_fare}</span>
-                      {showFareBreakdown ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-                    </div>
-                  </button>
-
-                  {showFareBreakdown && (
-                    <div className="p-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 space-y-2 text-xs">
-                      {(() => {
-                        const breakdown = getFareBreakdown(activeRide.distance_km || 1, activeRide.vehicle_type || 'BIKE');
-                        return (
-                          <>
-                            <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                              <span>Base Ride Fare</span>
-                              <span>₹{breakdown.baseFare}</span>
-                            </div>
-                            <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                              <span>Distance Charge ({activeRide.distance_km} km)</span>
-                              <span>₹{breakdown.distanceCharge}</span>
-                            </div>
-                            <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                              <span>Booking & Safety Fee</span>
-                              <span>₹{breakdown.bookingFee}</span>
-                            </div>
-                            {breakdown.surgeCharge > 0 && (
-                              <div className="flex justify-between text-amber-600 dark:text-amber-400 font-bold">
-                                <span>Peak Surge Charge ({breakdown.surgeMultiplier}x)</span>
-                                <span>+₹{breakdown.surgeCharge}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-800 font-black text-slate-900 dark:text-slate-100">
-                              <span>Total Amount Payable</span>
-                              <span className="text-amber-500 text-sm">₹{activeRide.estimated_fare}</span>
-                            </div>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-
-                {/* CLEAN RED CANCEL BUTTON (NO ICONS, NO BIG CHAT BUTTON) */}
-                <div className="pt-1">
-                  <button
-                    onClick={() => setIsCancelModalOpen(true)}
-                    className="w-full rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 text-xs transition-colors shadow-sm"
-                  >
-                    Cancel Ride
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-
-            {/* CASE C: RAPIDO SCREENSHOT 2 (HOME) & SCREENSHOT 4 (BOOKING) */}
-            {!activeRide && (
-              <div className="rounded-t-[32px] bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl max-h-[68vh] sm:max-h-[72vh] flex flex-col overflow-hidden shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.1)]">
                 {/* SEARCH ENTRY BAR (PINNED AT TOP) */}
-                <button
-                  onClick={() => {
-                    setActiveSelectTab('DESTINATION');
-                    setIsSearchOverlayOpen(true);
-                  }}
-                  className="w-full shrink-0 mb-3 flex items-center justify-between p-3.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 font-semibold shadow-sm hover:border-amber-500 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Search className="h-4 w-4 text-slate-400 shrink-0" />
-                    <span className="truncate text-slate-900 dark:text-slate-100 font-bold text-xs">
-                      {destinationAddress || 'Where do you want to go?'}
-                    </span>
-                  </div>
-                  {destinationAddress ? (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDestinationAddress('');
-                        setDestinationQuery('');
-                        setDestinationCoords(null);
-                      }}
-                      className="text-xs text-rose-500 font-bold hover:underline shrink-0 px-2"
-                    >
-                      Clear
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-amber-500 font-bold uppercase shrink-0 px-2">Search</span>
-                  )}
-                </button>
+                {!isBookingSheetCollapsed && (
+                  <button
+                    onClick={() => {
+                      setActiveSelectTab('DESTINATION');
+                      setIsSearchOverlayOpen(true);
+                    }}
+                    className="w-full shrink-0 mb-3 flex items-center justify-between p-3.5 rounded-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 font-semibold shadow-sm hover:border-amber-500 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                      <span className="truncate text-slate-900 dark:text-slate-100 font-bold text-xs">
+                        {destinationAddress || 'Where do you want to go?'}
+                      </span>
+                    </div>
+                    {destinationAddress ? (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDestinationAddress('');
+                          setDestinationQuery('');
+                          setDestinationCoords(null);
+                        }}
+                        className="text-xs text-rose-500 font-bold hover:underline shrink-0 px-2"
+                      >
+                        Clear
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-500 font-bold uppercase shrink-0 px-2">Search</span>
+                    )}
+                  </button>
+                )}
 
                 {!destinationCoords ? (
                   /* CASE C1: HOME SCREEN - RECENT HISTORIES & QUICK SERVICES */
@@ -1497,7 +1611,7 @@ export default function CustomerHomePage() {
                     {/* RECENT RIDE HISTORY */}
                     {recentLocations.length > 0 ? (
                       <div className="space-y-1">
-                        <div className="divide-y divide-dashed divide-slate-200 dark:divide-slate-800">
+                        <div className="divide-y divide-dashed divide-slate-200 dark:border-slate-800">
                           {recentLocations.slice(0, 4).map((loc, i) => (
                             <button
                               key={i}
@@ -1528,7 +1642,7 @@ export default function CustomerHomePage() {
                     )}
 
                     {/* QUICK SERVICES ROW ("Everything In Minutes") */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <h4 className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                         Everything In Minutes
                       </h4>
@@ -1554,62 +1668,105 @@ export default function CustomerHomePage() {
                       </button>
                     </div>
                   </div>
+                ) : isBookingSheetCollapsed ? (
+                  /* COLLAPSED 10% SHEET FOR VEHICLE SELECTION (LEAVING 90% MAP VISIBLE) */
+                  <div
+                    className="flex items-center justify-between gap-3 pt-1 cursor-pointer"
+                    onClick={() => setIsBookingSheetCollapsed(false)}
+                  >
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="h-9 w-9 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shrink-0">
+                        {selectedVehicle === 'BIKE' ? <Bike className="h-5 w-5 stroke-[2.5]" /> : <Car className="h-5 w-5 stroke-[2.5]" />}
+                      </div>
+                      <div className="truncate">
+                        <p className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+                          {selectedVehicle} • {distanceKm} km ride
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-semibold truncate max-w-[200px]">{destinationAddress}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-black text-sm text-slate-900 dark:text-slate-100">
+                        ₹{currentFareBreakdown ? currentFareBreakdown.totalFare : '--'}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsBookingSheetCollapsed(false);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1 shadow-sm transition-transform active:scale-95"
+                      >
+                        <span>VEHICLES</span>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  /* CASE C2: DESTINATION SELECTED - STICKY BOOK NOW BUTTON & SCROLLABLE VEHICLE LIST */
+                  /* CASE C2: EXPANDED DESTINATION SELECTED - SCROLLABLE VEHICLES & BOOK CTA */
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* SCROLLABLE VEHICLE OPTIONS LIST */}
-                    <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 space-y-2 pr-0.5 py-1">
-                      {(['BIKE', 'AUTO', 'CAB'] as VehicleType[]).map((vType) => {
-                        const cfg = VEHICLE_CONFIGS[vType];
-                        const breakdown = getFareBreakdown(distanceKm, vType);
-                        const selected = selectedVehicle === vType;
+                    {/* SCROLLABLE VEHICLE OPTIONS LIST (UNIFIED CONTAINER - ZERO REPEATED BORDERS) */}
+                    <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 py-1">
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-sm">
+                        {(['BIKE', 'AUTO', 'CAB'] as VehicleType[]).map((vType) => {
+                          const cfg = VEHICLE_CONFIGS[vType];
+                          const breakdown = getFareBreakdown(distanceKm, vType);
+                          const selected = selectedVehicle === vType;
 
-                        return (
-                          <button
-                            key={vType}
-                            onClick={() => setSelectedVehicle(vType)}
-                            className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all ${
-                              selected
-                                ? 'border-2 border-slate-900 dark:border-slate-100 bg-slate-50 dark:bg-slate-900/80 shadow-sm'
-                                : 'border border-slate-100 dark:border-slate-800/60 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900/40'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-900 dark:text-slate-100 font-bold shrink-0">
-                                {vType === 'BIKE' ? <Bike className="h-5 w-5 text-slate-800 dark:text-slate-200" /> : <Car className="h-5 w-5 text-slate-800 dark:text-slate-200" />}
-                              </div>
+                          return (
+                            <button
+                              key={vType}
+                              onClick={() => setSelectedVehicle(vType)}
+                              className={`w-full flex items-center justify-between p-3.5 transition-all text-left relative ${
+                                selected
+                                  ? 'bg-amber-400/10 dark:bg-amber-400/10'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              {/* Left Selected Accent Indicator Bar */}
+                              {selected && (
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-400" />
+                              )}
 
-                              <div className="text-left">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                                    {cfg.title}
-                                  </span>
-                                  {cfg.badge && selected && (
-                                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold text-[9px] uppercase">
-                                      {cfg.badge}
-                                    </span>
-                                  )}
+                              <div className="flex items-center gap-3.5 pl-1">
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold shrink-0 transition-colors ${
+                                  selected ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                                }`}>
+                                  {vType === 'BIKE' ? <Bike className="h-5 w-5 stroke-[2.5]" /> : <Car className="h-5 w-5 stroke-[2.5]" />}
                                 </div>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                  {cfg.etaMinutes} min away • Drop {breakdown.durationMinutes}m ({distanceKm} km)
-                                </p>
-                              </div>
-                            </div>
 
-                            <div className="text-right">
-                              <span className="font-black text-base text-slate-900 dark:text-slate-100">
-                                ₹{breakdown.totalFare}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100">
+                                      {cfg.title}
+                                    </span>
+                                    {cfg.badge && selected && (
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-700 dark:text-amber-300 font-extrabold text-[9px] uppercase">
+                                        {cfg.badge}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                    {cfg.etaMinutes} min away • Drop {breakdown.durationMinutes}m ({distanceKm} km)
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <span className="font-black text-sm text-slate-900 dark:text-slate-100">
+                                  ₹{breakdown.totalFare}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* PINNED / STICKY BOTTOM ACTION BAR: Cash Selector + BOOK NOW CTA */}
-                    <div className="shrink-0 pt-2.5 mt-1 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 z-10 flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shrink-0">
-                        <DollarSign className="h-4 w-4 text-emerald-500" />
+                    <div className="shrink-0 pt-3 mt-1 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 z-10 flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 px-3.5 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-900 text-xs font-extrabold text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shrink-0">
+                        <DollarSign className="h-4 w-4 text-emerald-500 stroke-[2.5]" />
                         <span>Cash</span>
                         <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                       </div>
@@ -1617,14 +1774,14 @@ export default function CustomerHomePage() {
                       <button
                         onClick={handleBookRide}
                         disabled={!pickupCoords || !destinationCoords || bookingLoading}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-amber-400 hover:bg-amber-300 py-3.5 text-sm font-extrabold text-slate-950 transition-transform active:scale-[0.99] disabled:opacity-40 shadow-md"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 py-3.5 text-sm font-black text-slate-950 transition-all active:scale-[0.98] disabled:opacity-40 shadow-xl shadow-amber-500/25 tracking-wide"
                       >
                         {bookingLoading ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <>
-                            <span>Book {selectedVehicle} • ₹{currentFareBreakdown ? currentFareBreakdown.totalFare : '--'}</span>
-                            <ArrowRight className="h-4 w-4" />
+                            <span>BOOK {selectedVehicle} • ₹{currentFareBreakdown ? currentFareBreakdown.totalFare : '--'}</span>
+                            <ArrowRight className="h-4 w-4 stroke-[3]" />
                           </>
                         )}
                       </button>
@@ -1773,7 +1930,7 @@ export default function CustomerHomePage() {
           captainRating={assignedCaptain?.rating_count ? (assignedCaptain.rating_sum / assignedCaptain.rating_count) : 5.0}
           finalFare={activeRide.estimated_fare}
           onSubmit={handleRatingSubmit}
-          onClose={() => setShowRatingModal(false)}
+          onClose={handleCloseRatingModal}
         />
       )}
 

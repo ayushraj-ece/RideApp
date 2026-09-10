@@ -7,7 +7,7 @@ import MapContainer from '@/components/map/MapContainer';
 import ChatDrawer from '@/components/chat/ChatDrawer';
 import CancelRideModal from '@/components/ride/CancelRideModal';
 import CaptainProfileDrawer from '@/components/profile/CaptainProfileDrawer';
-import CaptainNavigationOverlay from '@/components/navigation/CaptainNavigationOverlay';
+import CaptainBottomNav from '@/components/ui/CaptainBottomNav';
 import { createClient } from '@/lib/supabase/client';
 import { requestAndGetCurrentLocation } from '@/lib/location';
 import { Ride, UserProfile, CaptainProfile } from '@/types/ride';
@@ -79,7 +79,6 @@ export default function CaptainHomePage() {
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCaptainProfileOpen, setIsCaptainProfileOpen] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [isCardCollapsed, setIsCardCollapsed] = useState(false);
 
   const lastDbUpdateRef = useRef<number>(0);
@@ -586,6 +585,42 @@ export default function CaptainHomePage() {
     }
   };
 
+  // Directly launch external Google Maps with precise origin and destination GPS coordinates
+  const handleOpenNavigation = () => {
+    if (!activeRide) return;
+
+    const isHeadingToPickup = ['ACCEPTED', 'CAPTAIN_ARRIVING', 'CAPTAIN_ARRIVED'].includes(activeRide.status);
+
+    const targetLat = isHeadingToPickup
+      ? (activeRide.pickup_lat ?? (activeRide as any).pickup_latitude)
+      : (activeRide.destination_lat ?? (activeRide as any).destination_latitude);
+    const targetLng = isHeadingToPickup
+      ? (activeRide.pickup_lng ?? (activeRide as any).pickup_longitude)
+      : (activeRide.destination_lng ?? (activeRide as any).destination_longitude);
+    const targetAddress = isHeadingToPickup
+      ? activeRide.pickup_address
+      : activeRide.destination_address;
+
+    const originPos = gpsCoords || (captain?.latitude && captain?.longitude ? [captain.latitude, captain.longitude] : null);
+
+    let destinationParam = '';
+    if (targetLat != null && targetLng != null && !isNaN(Number(targetLat)) && !isNaN(Number(targetLng)) && Number(targetLat) !== 0) {
+      destinationParam = `${Number(targetLat)},${Number(targetLng)}`;
+    } else if (targetAddress) {
+      destinationParam = encodeURIComponent(targetAddress);
+    }
+
+    if (!destinationParam) return;
+
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${destinationParam}&travelmode=driving`;
+
+    if (originPos && originPos[0] && originPos[1]) {
+      url += `&origin=${Number(originPos[0])},${Number(originPos[1])}`;
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-200">
@@ -641,66 +676,66 @@ export default function CaptainHomePage() {
           />
         </div>
 
-        {/* Floating Top Header Bar - Earnings & Online Status */}
-        <div className="absolute top-4 inset-x-4 z-10 max-w-lg mx-auto pointer-events-auto flex items-center justify-between gap-3">
-          {/* Earnings Pill */}
-          <div className="flex-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
-                <DollarSign className="h-5 w-5" />
+        {/* UNIFIED SINGLE FLOATING HEADER CARD */}
+        <div className="absolute top-4 inset-x-4 z-10 max-w-md mx-auto pointer-events-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-xl space-y-2.5">
+            {/* ROW 1: EARNINGS & TRIPS + ONLINE STATUS TOGGLE */}
+            <div className="flex items-center justify-between gap-3">
+              {/* Earnings & Trips Info */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold shrink-0">
+                  <DollarSign className="h-4 w-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 block">
+                    Today's Earnings
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-black text-slate-900 dark:text-slate-100">
+                      ₹{todayEarnings.toFixed(0)}
+                    </span>
+                    <span className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500">
+                      • {completedTripsCount} {completedTripsCount === 1 ? 'Trip' : 'Trips'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">
-                  TODAY'S EARNINGS
-                </p>
-                <p className="text-base font-black text-slate-900 dark:text-slate-100">
-                  ₹{todayEarnings.toFixed(0)}
-                </p>
-              </div>
+
+              {/* Online / Offline Toggle Button */}
+              <button
+                onClick={toggleOnlineStatus}
+                className={`px-3.5 py-2 rounded-xl font-extrabold text-xs tracking-wider uppercase shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border shrink-0 ${
+                  isOnline
+                    ? 'bg-emerald-500 text-slate-950 border-emerald-400 hover:bg-emerald-400'
+                    : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-slate-950 animate-pulse' : 'bg-rose-500'}`} />
+                <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+              </button>
             </div>
 
-            <div className="h-8 w-px bg-slate-200 dark:bg-slate-800" />
-
-            <div className="text-right">
-              <p className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">
-                TRIPS
-              </p>
-              <p className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                {completedTripsCount}
-              </p>
+            {/* ROW 2: LIVE GPS LOCATION DIVIDER LINE */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
+              <button
+                onClick={detectCaptainLocation}
+                className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity group"
+                title="Click to refresh current location"
+              >
+                <Crosshair
+                  className={`h-3.5 w-3.5 shrink-0 ${isDetectingGps ? 'animate-spin text-amber-500' : 'text-emerald-500'}`}
+                />
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate group-hover:text-amber-500 transition-colors">
+                  {captainAddress}
+                </span>
+              </button>
             </div>
           </div>
-
-          {/* Online / Offline Toggle Button */}
-          <button
-            onClick={toggleOnlineStatus}
-            className={`px-4 py-3 rounded-2xl font-black text-xs tracking-wider uppercase shadow-xl flex items-center gap-2 transition-all active:scale-95 border ${
-              isOnline
-                ? 'bg-emerald-500 text-slate-950 border-emerald-400 hover:bg-emerald-400'
-                : 'bg-rose-500 text-white border-rose-400 hover:bg-rose-600'
-            }`}
-          >
-            <Power className="h-4 w-4 stroke-[3]" />
-            <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-          </button>
-        </div>
-
-        {/* Floating Location Detector pill */}
-        <div className="absolute top-20 left-4 z-10 pointer-events-auto">
-          <button
-            onClick={detectCaptainLocation}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-lg backdrop-blur-md text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-amber-500 transition-colors"
-          >
-            <Crosshair
-              className={`h-3.5 w-3.5 ${isDetectingGps ? 'animate-spin text-amber-500' : ''}`}
-            />
-            <span className="truncate max-w-[200px]">{captainAddress}</span>
-          </button>
         </div>
 
         {/* INCOMING RIDE REQUEST MODAL OVERLAY */}
         {incomingRequest && (
-          <div className="absolute inset-x-4 bottom-6 z-30 max-w-md mx-auto pointer-events-auto bg-slate-900/95 border-2 border-amber-500/80 rounded-3xl p-5 shadow-2xl backdrop-blur-xl text-slate-100 animate-in slide-in-from-bottom-8">
+          <div className="absolute inset-x-4 bottom-16 sm:bottom-20 z-30 max-w-md mx-auto pointer-events-auto bg-slate-900 border-2 border-amber-500 rounded-3xl p-5 shadow-2xl text-slate-100 animate-in slide-in-from-bottom-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -717,7 +752,7 @@ export default function CaptainHomePage() {
             </div>
 
             {/* Ride Details */}
-            <div className="space-y-3 bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700/80 text-xs">
+            <div className="space-y-3 bg-slate-800 rounded-2xl p-3.5 border border-slate-700 text-xs">
               <div className="flex items-start gap-2.5">
                 <div className="h-2 w-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                 <div>
@@ -771,12 +806,12 @@ export default function CaptainHomePage() {
           </div>
         )}
 
-        {/* ACTIVE RIDE CARD OVERLAY */}
+        {/* ACTIVE RIDE CARD OVERLAY (MINIMAL 10% SHEET DEFAULT FOR 90% MAP VIEW) */}
         {activeRide && !incomingRequest && (
-          <div className="absolute inset-x-4 bottom-6 z-20 max-w-md mx-auto pointer-events-auto bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl backdrop-blur-xl transition-all">
+          <div className="absolute inset-x-4 bottom-16 sm:bottom-20 z-20 max-w-md mx-auto pointer-events-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl transition-all">
             {/* Header Status */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 truncate">
                 <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 font-black text-[10px] uppercase tracking-wider">
                   {activeRide.status.replace(/_/g, ' ')}
                 </span>
@@ -789,7 +824,7 @@ export default function CaptainHomePage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsNavigating(true)}
+                  onClick={handleOpenNavigation}
                   className="px-3 py-1.5 rounded-xl bg-sky-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md hover:bg-sky-400 transition-transform active:scale-95"
                 >
                   <Navigation className="h-3.5 w-3.5 fill-current" />
@@ -797,10 +832,12 @@ export default function CaptainHomePage() {
                 </button>
                 <button
                   onClick={() => setIsCardCollapsed(!isCardCollapsed)}
-                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1 hover:text-amber-500 transition-colors"
+                  title={isCardCollapsed ? "Expand details" : "Collapse panel for full map"}
                 >
+                  <span className="hidden sm:inline">{isCardCollapsed ? 'Details' : 'Minimize'}</span>
                   {isCardCollapsed ? (
-                    <ChevronUp className="h-4 w-4" />
+                    <ChevronUp className="h-4 w-4 text-amber-500" />
                   ) : (
                     <ChevronDown className="h-4 w-4" />
                   )}
@@ -881,28 +918,25 @@ export default function CaptainHomePage() {
                 )}
 
                 {activeRide.status === 'CAPTAIN_ARRIVED' && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                      ENTER PICKUP OTP FROM CUSTOMER:
-                    </p>
-                    <div className="flex gap-2">
+                  <div className="pt-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
                       <input
                         type="text"
                         maxLength={4}
-                        placeholder="4-Digit OTP"
+                        placeholder="Enter Pickup PIN"
                         value={otpInput}
                         onChange={(e) => setOtpInput(e.target.value)}
-                        className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 font-mono text-center font-bold text-base tracking-widest outline-none focus:border-amber-500"
+                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-semibold placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-amber-500 transition-all text-slate-900 dark:text-slate-100"
                       />
                       <button
                         onClick={handleVerifyOtp}
-                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 font-extrabold text-xs text-slate-950 transition-transform active:scale-95"
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 transition-transform active:scale-95 shadow-sm"
                       >
-                        VERIFY OTP
+                        Verify PIN
                       </button>
                     </div>
                     {otpError && (
-                      <p className="text-xs font-bold text-rose-500">{otpError}</p>
+                      <p className="text-xs font-bold text-rose-500 pl-1">{otpError}</p>
                     )}
                   </div>
                 )}
@@ -911,19 +945,18 @@ export default function CaptainHomePage() {
                   <div className="space-y-3 pt-1">
                     {activeRide.is_parcel && activeRide.drop_otp && (
                       <div className="space-y-1.5">
-                        <p className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
-                          ENTER PARCEL DROP-OFF OTP:
-                        </p>
-                        <input
-                          type="text"
-                          maxLength={4}
-                          placeholder="Drop OTP"
-                          value={dropOtpInput}
-                          onChange={(e) => setDropOtpInput(e.target.value)}
-                          className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2 font-mono text-center font-bold text-sm tracking-widest outline-none focus:border-amber-500"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            maxLength={4}
+                            placeholder="Enter Drop-off PIN"
+                            value={dropOtpInput}
+                            onChange={(e) => setDropOtpInput(e.target.value)}
+                            className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-bold placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-amber-400 focus:bg-white dark:focus:bg-slate-950 transition-all text-center tracking-wider text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
                         {dropOtpError && (
-                          <p className="text-xs font-bold text-rose-500">
+                          <p className="text-xs font-bold text-rose-500 pl-1">
                             {dropOtpError}
                           </p>
                         )}
@@ -932,7 +965,7 @@ export default function CaptainHomePage() {
 
                     <button
                       onClick={handleCompleteRide}
-                      className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-transform active:scale-95 shadow-xl"
+                      className="w-full py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-transform active:scale-95 shadow-lg"
                     >
                       COMPLETE RIDE & COLLECT ₹{activeRide.estimated_fare}
                     </button>
@@ -956,11 +989,6 @@ export default function CaptainHomePage() {
             recipientName={activeRide.customer?.name || 'Customer'}
             recipientPhone={activeRide.customer?.phone}
           />
-          <CaptainNavigationOverlay
-            isOpen={isNavigating}
-            onClose={() => setIsNavigating(false)}
-            ride={activeRide}
-          />
         </>
       )}
 
@@ -976,6 +1004,18 @@ export default function CaptainHomePage() {
           }}
         />
       )}
+
+      {/* CAPTAIN BOTTOM NAVIGATION BAR */}
+      <CaptainBottomNav
+        activeTab={isCaptainProfileOpen ? 'PROFILE' : 'DUTY'}
+        onTabSelect={(tab) => {
+          if (tab === 'PROFILE') {
+            setIsCaptainProfileOpen((prev) => !prev);
+          } else {
+            setIsCaptainProfileOpen(false);
+          }
+        }}
+      />
     </div>
   );
 }
