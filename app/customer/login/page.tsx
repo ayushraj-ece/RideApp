@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, User, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, Eye, EyeOff, User, ArrowRight, LogIn, UserPlus, CheckSquare, Square } from 'lucide-react';
 
 export default function CustomerLoginPage() {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -75,39 +75,69 @@ export default function CustomerLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6f5] text-[#111816] flex flex-col justify-between items-center p-4 sm:p-6 font-sans selection:bg-[#8fbf7f] selection:text-[#143d30]">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between items-center p-4 sm:p-6 font-sans selection:bg-amber-400 selection:text-slate-950">
       {/* Header Bar */}
       <header className="w-full max-w-md pt-4 pb-2 flex items-center justify-between relative">
         <button
           onClick={() => router.push('/')}
-          className="h-9 w-9 rounded-full bg-white shadow-xs hover:bg-slate-50 flex items-center justify-center text-[#111816] transition-colors"
+          className="h-10 w-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm hover:bg-slate-50 flex items-center justify-center text-slate-800 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4 stroke-[2.5]" />
+          <ArrowLeft className="h-5 w-5 stroke-[2.5]" />
         </button>
 
-        <div className="inline-flex items-center gap-0.5 mx-auto -ml-9">
-          <span className="text-xl font-bold tracking-tight text-[#111816]">
+        <div className="inline-flex items-center gap-0.5 mx-auto -ml-10">
+          <span className="text-2xl font-black tracking-tighter text-slate-900">
             RIDE
           </span>
-          <span className="text-xl font-bold tracking-tight text-[#143d30]">
+          <span className="text-2xl font-black tracking-tighter text-amber-500">
             ON
           </span>
         </div>
       </header>
 
-      {/* Main Borderless Container Card */}
-      <main className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-sm my-auto space-y-6">
+      {/* Main Rido Card Container */}
+      <main className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 my-auto space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-xl font-bold text-[#111816] tracking-tight">
-            {mode === 'LOGIN' ? 'Welcome to RIDEON login now!' : 'Create an Account'}
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            {mode === 'LOGIN' ? 'Welcome Back 👋' : 'Get Started With RIDEON 🚀'}
           </h1>
-          <p className="text-xs font-semibold text-[#143d30] uppercase tracking-wider">
-            Customer / Rider Portal
+          <p className="text-xs font-semibold text-slate-500">
+            {mode === 'LOGIN'
+              ? 'Enter your credentials to access your rider portal.'
+              : 'Sign up to start booking rides instantly.'}
           </p>
         </div>
 
+        {/* Auth Mode Switcher Segmented Tabs */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl">
+          <button
+            type="button"
+            onClick={() => { setMode('LOGIN'); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'LOGIN'
+                ? 'bg-slate-950 text-amber-400 shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <LogIn className="h-3.5 w-3.5" />
+            <span>Log In</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('REGISTER'); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'REGISTER'
+                ? 'bg-slate-950 text-amber-400 shadow-md'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span>Create Account</span>
+          </button>
+        </div>
+
         {error && (
-          <div className="p-3 rounded-2xl bg-rose-50 text-xs font-semibold text-rose-600 text-center">
+          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-600 text-center">
             {error}
           </div>
         )}
@@ -115,7 +145,7 @@ export default function CustomerLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'REGISTER' && (
             <div className="space-y-1">
-              <label className="block text-[11px] font-semibold text-slate-500">Full Name</label>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">Full Name</label>
               <div className="relative flex items-center">
                 <User className="absolute left-3.5 h-4 w-4 text-slate-400" />
                 <input
@@ -123,15 +153,15 @@ export default function CustomerLoginPage() {
                   required={mode === 'REGISTER'}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Michael Brooks"
-                  className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
+                  placeholder="John Doe"
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 transition-all outline-none"
                 />
               </div>
             </div>
           )}
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-semibold text-slate-500">Email</label>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email Address</label>
             <div className="relative flex items-center">
               <Mail className="absolute left-3.5 h-4 w-4 text-slate-400" />
               <input
@@ -139,14 +169,14 @@ export default function CustomerLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="mica.brooks@gmail.com"
-                className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-4 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
+                placeholder="rider@example.com"
+                className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 transition-all outline-none"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-semibold text-slate-500">Password</label>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">Password</label>
             <div className="relative flex items-center">
               <Lock className="absolute left-3.5 h-4 w-4 text-slate-400" />
               <input
@@ -156,7 +186,7 @@ export default function CustomerLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-[#f4f6f5] border-0 rounded-2xl pl-10 pr-10 py-3 text-xs font-semibold text-[#111816] placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-[#8fbf7f] transition-all outline-none"
+                className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl pl-10 pr-10 py-3 text-xs font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 transition-all outline-none"
               />
               <button
                 type="button"
@@ -173,10 +203,10 @@ export default function CustomerLoginPage() {
             <button
               type="button"
               onClick={() => setRememberMe(!rememberMe)}
-              className="flex items-center gap-1.5 text-slate-600 font-medium select-none"
+              className="flex items-center gap-1.5 text-slate-600 font-semibold select-none"
             >
               {rememberMe ? (
-                <CheckSquare className="h-4 w-4 text-[#143d30]" />
+                <CheckSquare className="h-4 w-4 text-amber-500" />
               ) : (
                 <Square className="h-4 w-4 text-slate-300" />
               )}
@@ -186,57 +216,37 @@ export default function CustomerLoginPage() {
             {mode === 'LOGIN' && (
               <button
                 type="button"
-                onClick={() => setError('Password reset link sent if account exists.')}
-                className="font-semibold text-slate-600 hover:text-slate-900"
+                onClick={() => setError('Password reset instructions sent to your email.')}
+                className="font-bold text-slate-700 hover:text-slate-900"
               >
-                Forget Password?
+                Forgot Password?
               </button>
             )}
           </div>
 
-          {/* Full-Width Forest Emerald Button */}
+          {/* Prominent Solid Amber Submit Button */}
           <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-6 rounded-full bg-[#143d30] hover:bg-[#194c3c] text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all disabled:opacity-50 active:scale-[0.98]"
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm tracking-wide shadow-lg shadow-amber-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? 'Processing...' : mode === 'LOGIN' ? 'Login' : 'Sign Up'}
+              {loading ? (
+                <span>Processing...</span>
+              ) : (
+                <>
+                  <span>{mode === 'LOGIN' ? 'LOG IN TO RIDER PORTAL' : 'CREATE ACCOUNT'}</span>
+                  <ArrowRight className="h-4 w-4 stroke-[3]" />
+                </>
+              )}
             </button>
           </div>
         </form>
-
-        {/* Toggle Mode Option */}
-        <div className="text-center text-xs font-medium text-slate-500 pt-1">
-          {mode === 'LOGIN' ? (
-            <span>
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={() => { setMode('REGISTER'); setError(''); }}
-                className="font-bold text-[#143d30] hover:underline"
-              >
-                Create an account
-              </button>
-            </span>
-          ) : (
-            <span>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => { setMode('LOGIN'); setError(''); }}
-                className="font-bold text-[#143d30] hover:underline"
-              >
-                Login
-              </button>
-            </span>
-          )}
-        </div>
       </main>
 
       {/* Switch Portal Footer */}
-      <footer className="py-3 text-center text-xs font-semibold text-slate-400">
-        <Link href="/captain/login" className="hover:text-[#143d30]">
+      <footer className="py-3 text-center text-xs font-bold text-slate-400">
+        <Link href="/captain/login" className="hover:text-slate-700">
           Are you a Captain? Switch to Captain Login →
         </Link>
       </footer>
