@@ -104,20 +104,26 @@ export default function CaptainRidesPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleDeleteOldRides}
-            disabled={deletingOld || loading || rides.length === 0}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-xs font-bold transition-transform active:scale-95 shrink-0 disabled:opacity-50"
-            title="Delete trips older than 10 days"
-          >
-            {deletingOld ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">Delete &gt;10 Days</span>
-            <span className="sm:hidden">&gt;10 Days</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-300/60 dark:border-slate-700/60">
+              <Calendar className="h-3 w-3 text-amber-500" />
+              <span>Auto-Purge &gt;10 Days</span>
+            </span>
+
+            <button
+              onClick={handleDeleteOldRides}
+              disabled={deletingOld || loading || rides.length === 0}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 text-xs font-bold transition-transform active:scale-95 disabled:opacity-50"
+              title="Purge trips older than 10 days"
+            >
+              {deletingOld ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              <span>Purge Now</span>
+            </button>
+          </div>
         </div>
 
         {loading ? (
